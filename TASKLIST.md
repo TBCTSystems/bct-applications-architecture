@@ -1,4 +1,3 @@
-content: |
   # Review In-House Libraries and Determine Future Roadmap
 
   **Objective:** Assess and plan the future of our in-house libraries to align with company goals.
