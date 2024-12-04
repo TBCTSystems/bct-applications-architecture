@@ -1,4 +1,4 @@
-    # Architecture Decision Record (ADR) Process
+ # Architecture Decision Record (ADR) Process
 
   **Objective**: Formalize the process of documenting architectural decisions.
 
