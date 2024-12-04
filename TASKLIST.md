@@ -1,3 +1,18 @@
+    # Architecture Decision Record (ADR) Process
+
+  **Objective**: Formalize the process of documenting architectural decisions.
+
+  ## Details:
+  - Context and problem statement driving the decision.
+  - The decision made and its scope.
+  - PoCs or experiments conducted to validate the decision.
+  - Consideration of licensing models and costs.
+  - Evaluation of maintainability and extensibility of the solution.
+  - References to supporting documentation or discussions.
+
+  **Reference:**
+  - [Documenting Architecture Decisions](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)
+  
   # Review In-House Libraries and Determine Future Roadmap
 
   **Objective:** Assess and plan the future of our in-house libraries to align with company goals.
@@ -15,6 +30,7 @@
   # Research Alternatives to NServiceBus
 
   **Objective:** Identify messaging frameworks with better licensing terms and cost benefits.
+  **Methodology:** Follow established ADR methodology.
 
   **Potential Alternatives:**
   - **Rebus**
@@ -49,12 +65,7 @@
   - Go over benchmarking libraries and select and document its usage
   - Select appropriate tooling for monitoring and enforcement.
 
-  # Implement Architecture Decision Record (ADR) Process
 
-  **Objective:** Formalize the process of documenting architectural decisions.
-
-  **Reference:**
-  - [Documenting Architecture Decisions](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)
 
   # Create Teams Group for Architectural Communication
 
