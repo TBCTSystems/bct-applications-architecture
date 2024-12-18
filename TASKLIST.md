@@ -7,6 +7,8 @@
   - The decision made and its scope.
   - PoCs or experiments conducted to validate the decision.
   - Consideration of licensing models and costs.
+
+  - Evaluat
   - Evaluation of maintainability and extensibility of the solution.
   - References to supporting documentation or discussions.
 
@@ -65,13 +67,11 @@
   - Go over benchmarking libraries and select and document its usage
   - Select appropriate tooling for monitoring and enforcement.
 
-
-
   # Create Teams Group for Architectural Communication
 
   **Objective:** Enhance communication among architects and tech leads via a dedicated Teams group.
 
-  # Establish Recurring Architectural Meetings
+  # Establish Recurring Architectural Meetings [x] DONE
 
   **Objective:** Schedule regular meetings for architectural discussions and updates.
 
