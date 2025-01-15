@@ -80,6 +80,7 @@ public class MethodCallExtractor : CSharpSyntaxWalker
                 );
                 
                 _structure.CallGraph.AddCall(call);
+                _structure.CallGraph.AddSourceFile(_filePath);
             }
         }
     }

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -179,6 +179,19 @@ class Program
 
     private static async Task AnalyzeProject(Project project, ExtractedStructure structure, CommandLineOptions options)
     {
+        // Record NuGet package dependencies
+        foreach (var reference in project.MetadataReferences)
+        {
+            if (reference.Display != null && reference.Display.Contains("nuget"))
+            {
+                structure.NuGetPackages.Add(new ExtractedNuGetPackage
+                {
+                    PackageName = Path.GetFileNameWithoutExtension(reference.Display),
+                    ProjectPath = project.FilePath ?? "Unknown"
+                });
+            }
+        }
+
         foreach (var document in project.Documents)
         {
             if (document.FilePath == null) continue;
@@ -274,7 +287,33 @@ class Program
         // Add method call graph
         sb.AppendLine("## Method Call Graph");
         sb.AppendLine();
+        sb.AppendLine("Generated from:");
+        foreach (var file in structure.CallGraph.SourceFiles.Distinct())
+        {
+            sb.AppendLine($"- `{file}`");
+        }
+        sb.AppendLine();
         sb.AppendLine(structure.CallGraph.ToMermaidFlowchart());
+
+        // Add NuGet packages section
+        sb.AppendLine("## NuGet Packages");
+        sb.AppendLine();
+        var packagesByProject = structure.NuGetPackages
+            .GroupBy(p => p.ProjectPath)
+            .OrderBy(g => g.Key);
+            
+        foreach (var projectGroup in packagesByProject)
+        {
+            sb.AppendLine($"### {Path.GetFileName(projectGroup.Key)}");
+            sb.AppendLine($"Path: `{projectGroup.Key}`");
+            sb.AppendLine();
+            
+            foreach (var package in projectGroup.OrderBy(p => p.PackageName))
+            {
+                sb.AppendLine($"- {package.PackageName}");
+            }
+            sb.AppendLine();
+        }
 
         // Write the analysis file
         Directory.CreateDirectory(Path.GetDirectoryName(analysisPath)!);

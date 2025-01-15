@@ -74,6 +74,9 @@ public class CallGraph
 {
     private readonly Dictionary<string, MethodNode> _nodes = new();
     private readonly List<MethodCall> _calls = new();
+    private readonly HashSet<string> _sourceFiles = new();
+
+    public IEnumerable<string> SourceFiles => _sourceFiles;
 
     public void AddNode(MethodNode node)
     {
@@ -101,6 +104,11 @@ public class CallGraph
     public IEnumerable<MethodCall> GetCallsTo(string calleeFullName)
     {
         return _calls.Where(c => c.Callee.FullName == calleeFullName);
+    }
+
+    public void AddSourceFile(string filePath)
+    {
+        _sourceFiles.Add(filePath);
     }
 
     public string ToMermaidFlowchart()

@@ -88,12 +88,10 @@ public class AbstractClassExtractor : CSharpSyntaxWalker
             }
 
             // Handle base types and interface implementations
-            if (node.BaseList != null)
+            var semanticModel = _compilation.GetSemanticModel(node.SyntaxTree);
+            if (semanticModel != null && node.BaseList != null)
             {
-                var semanticModel = _compilation.GetSemanticModel(node.SyntaxTree);
-                if (semanticModel != null)
-                {
-                    foreach (var baseType in node.BaseList.Types)
+                foreach (var baseType in node.BaseList.Types)
                     {
                         if (baseType.Type != null)
                         {
@@ -109,13 +107,11 @@ public class AbstractClassExtractor : CSharpSyntaxWalker
                         }
                     }
                 }
-            }
 
-            _structure.Classes.Add(extractedClass);
+                _structure.Classes.Add(extractedClass);
+                base.VisitClassDeclaration(node);
+            }
         }
-        
-        base.VisitClassDeclaration(node);
-    }
 
     private static string GetAccessModifier(SyntaxTokenList modifiers)
     {
