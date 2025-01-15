@@ -1,0 +1,6 @@
+memlog/
+bin/
+obj/
+.vs/
+*.suo
+*.user
