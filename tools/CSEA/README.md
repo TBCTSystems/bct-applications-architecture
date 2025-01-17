@@ -94,10 +94,9 @@ Example report structure:
   - void MyMethod(string param)
 
 ## Method Call Graph
-```mermaid
+
 flowchart TD
     MyClass.MyMethod --> OtherClass.OtherMethod
-```
 
 ## NuGet Packages
 ### MyProject.csproj
@@ -107,7 +106,7 @@ flowchart TD
 
 ## Requirements
 
-- .NET 6.0 or later
+- .NET 7.0 or later
 - MSBuild (for project/solution analysis)
 - Roslyn compiler services
 
