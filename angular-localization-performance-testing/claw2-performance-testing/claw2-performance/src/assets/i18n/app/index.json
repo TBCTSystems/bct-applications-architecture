@@ -1,0 +1,14 @@
+[
+  {
+    "moduleName": "app",
+    "languages": [
+      {
+        "language": "en-US",
+        "languageName": "English",
+        "relativePath": "en-US.json",
+        "isDefault": true,
+        "sha256": "93b997dd21ee943b145bd851f823041230e8eb7006825420aaf30d3866a519fe"
+      }
+    ]
+  }
+]

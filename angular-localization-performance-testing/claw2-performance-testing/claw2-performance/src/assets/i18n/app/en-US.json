@@ -1,0 +1,98 @@
+[
+  {
+    "stringId": "app.title",
+    "localString": "Welcome to Our Angular 18 Single-Page Baseline"
+  },
+  {
+    "stringId": "app.description",
+    "localString": "This single page simulates a typical scenario that would require localization. We have static text, user-specific data, and a small dataset for demonstration. By integrating different localization libraries, we can measure how each approach affects loading time, memory usage, and bundle size."
+  },
+  {
+    "stringId": "user.section.title",
+    "localString": "User Information"
+  },
+  {
+    "stringId": "user.firstName",
+    "localString": "First Name"
+  },
+  {
+    "stringId": "user.lastName",
+    "localString": "Last Name"
+  },
+  {
+    "stringId": "user.email",
+    "localString": "Email"
+  },
+  {
+    "stringId": "stats.section.title",
+    "localString": "Key Stats"
+  },
+  {
+    "stringId": "stats.metric",
+    "localString": "Metric"
+  },
+  {
+    "stringId": "stats.value",
+    "localString": "Value"
+  },
+  {
+    "stringId": "stats.totalUsers",
+    "localString": "Total Users"
+  },
+  {
+    "stringId": "stats.activeSessions",
+    "localString": "Active Sessions"
+  },
+  {
+    "stringId": "stats.responseTime",
+    "localString": "Response Time"
+  },
+  {
+    "stringId": "stats.totalRevenue",
+    "localString": "Total Revenue"
+  },
+  {
+    "stringId": "stats.date",
+    "localString": "Date"
+  },
+  {
+    "stringId": "transactions.title",
+    "localString": "Transactions"
+  },
+  {
+    "stringId": "transactions.item",
+    "localString": "Item"
+  },
+  {
+    "stringId": "transactions.date",
+    "localString": "Date"
+  },
+  {
+    "stringId": "transactions.price",
+    "localString": "Price"
+  },
+  {
+    "stringId": "transactions.quantity",
+    "localString": "Quantity"
+  },
+  {
+    "stringId": "transactions.total",
+    "localString": "Total"
+  },
+  {
+    "stringId": "button.showMore",
+    "localString": "Show Additional Info"
+  },
+  {
+    "stringId": "button.hideMore",
+    "localString": "Hide Additional Info"
+  },
+  {
+    "stringId": "moreInfo.title",
+    "localString": "More Information"
+  },
+  {
+    "stringId": "moreInfo.description",
+    "localString": "This block contains extra text. In a localized application, this text would be translated dynamically or at build-time, depending on which library is used. Observing how quickly this content appears or how large the bundle becomes is part of our performance analysis."
+  }
+]
