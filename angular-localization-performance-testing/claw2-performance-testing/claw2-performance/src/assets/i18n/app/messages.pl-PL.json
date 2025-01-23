@@ -1,0 +1,34 @@
+{
+  "locale": "pl-PL",
+  "translations": {
+    "app.title": "Witamy w naszej bazowej jednostronicowej aplikacji Angular 18 - 🇵🇱",
+    "app.description": "Ta jednostronicowa aplikacja symuluje typowy scenariusz wymagający lokalizacji. Mamy tutaj tekst statyczny, dane użytkownika oraz mały zestaw przykładowych danych. Dzięki integracji różnych bibliotek lokalizacyjnych możemy ocenić, jak każda z nich wpływa na czas ładowania, zużycie pamięci oraz rozmiar paczki.",
+
+    "user.section.title": "Informacje o użytkowniku",
+    "user.firstName": "Imię",
+    "user.lastName": "Nazwisko",
+    "user.email": "Adres e-mail",
+
+    "stats.section.title": "Kluczowe statystyki",
+    "stats.metric": "Metryka",
+    "stats.value": "Wartość",
+    "stats.totalUsers": "Łączna liczba użytkowników",
+    "stats.activeSessions": "Aktywne sesje",
+    "stats.responseTime": "Czas odpowiedzi",
+    "stats.totalRevenue": "Łączne przychody",
+    "stats.date": "Data",
+
+    "transactions.title": "Transakcje",
+    "transactions.item": "Pozycja",
+    "transactions.date": "Data",
+    "transactions.price": "Cena",
+    "transactions.quantity": "Ilość",
+    "transactions.total": "Suma",
+
+    "button.showMore": "Pokaż dodatkowe informacje",
+    "button.hideMore": "Ukryj dodatkowe informacje",
+
+    "moreInfo.title": "Więcej informacji",
+    "moreInfo.description": "Ten blok zawiera dodatkowy tekst. W zlokalizowanej aplikacji ten tekst byłby tłumaczony dynamicznie lub na etapie kompilacji, w zależności od używanej biblioteki. Obserwowanie szybkości wyświetlania tej treści oraz wielkości paczki jest częścią naszej analizy wydajności."
+  }
+}

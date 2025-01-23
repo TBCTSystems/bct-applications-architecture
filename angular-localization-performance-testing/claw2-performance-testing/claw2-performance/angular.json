@@ -4,6 +4,13 @@
   "newProjectRoot": "projects",
   "projects": {
     "claw2-performance": {
+    "i18n": {
+      "sourceLocale": "fa",
+      "locales": {
+        "en-US": "src/assets/i18n/app/messages.en-US.json",
+        "pl-PL": "src/assets/i18n/app/messages.pl-PL.json"
+      }
+    },
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -13,11 +20,13 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
+            "localize": true,
             "outputPath": "dist/claw2-performance",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
-              "zone.js"
+              "zone.js",
+              "@angular/localize/init"
             ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
@@ -46,9 +55,17 @@
               "outputHashing": "all"
             },
             "development": {
+            
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap": true,
+              "localize": ["pl-PL"]
+            },
+            "pl": {
+              "localize": ["pl-PL"]
+            },
+            "en-US": {
+              "localize": ["en-US"]
             }
           },
           "defaultConfiguration": "production"
@@ -61,6 +78,12 @@
             },
             "development": {
               "buildTarget": "claw2-performance:build:development"
+            },
+            "pl": {
+               "buildTarget": "claw2-performance:build:pl-PL"
+            },
+            "en-US": {
+               "buildTarget": "claw2-performance:build:en-US"
             }
           },
           "defaultConfiguration": "development"
@@ -68,7 +91,8 @@
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "buildTarget": "claw2-performance:build"
+            "buildTarget": "claw2-performance:build",
+            "outputPath": "src/assets/i18n/app"
           }
         },
         "test": {
@@ -76,7 +100,8 @@
           "options": {
             "polyfills": [
               "zone.js",
-              "zone.js/testing"
+              "zone.js/testing",
+              "@angular/localize/init"
             ],
             "tsConfig": "tsconfig.spec.json",
             "assets": [
@@ -91,5 +116,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }

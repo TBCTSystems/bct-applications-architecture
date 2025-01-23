@@ -2,6 +2,11 @@
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.0.0.
 
+## Specific to Localize
+Since localize replaces translation values at compile time, reading from the JSON file versus hardcoding values in the HTML shouldn’t make a difference. However, to ensure consistency and avoid potential discrepancies, I set the default language to Farsi. This forces English values to be explicitly read from the JSON file for comparison purposes, ensuring we’re comparing apples to apples.
+
+Running `ng serve` will serve the application in Polish. To serve it in English, use the following command: `ng serve --configuration=en-US`
+
 ## Development server
 
 Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.

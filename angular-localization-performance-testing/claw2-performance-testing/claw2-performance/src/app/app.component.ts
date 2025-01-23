@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { BctTranslationService } from 'bct-applications-platform-translation';
 import { WebVitalsService } from './performance/web-vitals.service';
 
 @Component({
@@ -9,17 +8,33 @@ import { WebVitalsService } from './performance/web-vitals.service';
 })
 export class AppComponent implements OnInit {
   constructor(
-    private translationService: BctTranslationService,
     private webVitalsService: WebVitalsService
   ) {}
 
   ngOnInit() {
     // Start measuring performance metrics
     this.webVitalsService.measureAll();
-    
-    // Initialize translations
-    this.translationService.setLanguage('en-US').subscribe();
   }
+
+  readonly LABELS: Record<string, string> = {
+    'stats.totalUsers': $localize`:@@stats.totalUsers:Total Users`,
+    'stats.activeSessions': $localize`:@@stats.activeSessions:Active Sessions`,
+    'stats.responseTime': $localize`:@@stats.responseTime:Response Time`,
+    'stats.totalRevenue': $localize`:@@stats.totalRevenue:Total Revenue`,
+    'stats.date': $localize`:@@stats.date:Date`,
+
+    'transactions.title': $localize`:@@transactions.title:Transactions`,
+    'transactions.item': $localize`:@@transactions.item:Item`,
+    'transactions.date': $localize`:@@transactions.date:Date`,
+    'transactions.price': $localize`:@@transactions.price:Price`,
+    'transactions.quantity': $localize`:@@transactions.quantity:Quantity`,
+    'transactions.total': $localize`:@@transactions.total:Total`,
+
+    'button.showMore': $localize`:@@button.showMore:Show Additional Info`,
+    'button.hideMore': $localize`:@@button.hideMore:Hide Additional Info`,
+    'moreInfo.title': $localize`:@@moreInfo.title:More Information`,
+    'moreInfo.description': $localize`:@@moreInfo.description:This block contains extra text. In a localized application, this text would be translated dynamically or at build-time, depending on which library is used. Observing how quickly this content appears or how large the bundle becomes is part of our performance analysis.`,
+  };
 
   showMoreInfo = false;
   
@@ -78,5 +93,9 @@ export class AppComponent implements OnInit {
 
   toggleInfo() {
     this.showMoreInfo = !this.showMoreInfo;
+  }
+
+  getTranslatedLabel(labelKey: string): string {
+    return this.LABELS[labelKey] ?? labelKey;
   }
 }
