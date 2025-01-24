@@ -2,10 +2,39 @@
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.0.0.
 
-## Specific to Localize
+## Specific To `Localize`
 Since localize replaces translation values at compile time, reading from the JSON file versus hardcoding values in the HTML shouldn’t make a difference. However, to ensure consistency and avoid potential discrepancies, I set the default language to Farsi. This forces English values to be explicitly read from the JSON file for comparison purposes, ensuring we’re comparing apples to apples.
 
 Running `ng serve` will serve the application in Polish. To serve it in English, use the following command: `ng serve --configuration=en-US`
+
+
+### Runtime Translation Limitation
+Unlike libraries such as `ngx-translate` and `Transloco`, which support dynamic runtime translations through features like the `| translate` pipe, `localize` does not natively provide strong support for runtime/dynamic translations. For scenarios like translating keys dynamically in an `ngFor` loop based on a label value, I had to use a workaround to dynamically resolve the translation key.
+
+Here’s an example of how I achieved this:
+
+```typescript
+  readonly LABELS: Record<string, string> = {
+    'stats.totalUsers': $localize`:@@stats.totalUsers:Total Users`,
+    'stats.activeSessions': $localize`:@@stats.activeSessions:Active Sessions`,
+    'stats.responseTime': $localize`:@@stats.responseTime:Response Time`,
+    'stats.totalRevenue': $localize`:@@stats.totalRevenue:Total Revenue`,
+    'stats.date': $localize`:@@stats.date:Date`,
+
+    /// rest of the keys
+
+    getTranslatedLabel(labelKey: string): string {
+      return this.LABELS[labelKey] ?? labelKey;
+  }
+  };
+``` 
+
+```HTML
+  <tr *ngFor="let item of stats">
+    <td>{{ getTranslatedLabel(item.label) }}</td>
+    <td>{{ item.value }}</td>
+  </tr>
+```
 
 ## Development server
 
