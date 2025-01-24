@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { WebVitalsService } from './performance/web-vitals.service';
-
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
