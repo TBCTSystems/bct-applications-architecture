@@ -1,29 +1,29 @@
 <div class="container">
-  <h1 class="text-center">{{ 'app.title' | translate }}</h1>
+  <h1 class="text-center">{{ 'app.title' | transloco }}</h1>
 
-  <p class="mb-4">{{ 'app.description' | translate }}</p>
+  <p class="mb-4">{{ 'app.description' | transloco }}</p>
 
   <!-- User Info -->
   <section class="user-info mb-4">
-    <h2>{{ 'user.section.title' | translate }}</h2>
-    <p><strong>{{ 'user.firstName' | translate }}:</strong> {{ user.firstName }}</p>
-    <p><strong>{{ 'user.lastName' | translate }}:</strong> {{ user.lastName }}</p>
-    <p><strong>{{ 'user.email' | translate }}:</strong> {{ user.email }}</p>
+    <h2>{{ 'user.section.title' | transloco }}</h2>
+    <p><strong>{{ 'user.firstName' | transloco }}:</strong> {{ user.firstName }}</p>
+    <p><strong>{{ 'user.lastName' | transloco }}:</strong> {{ user.lastName }}</p>
+    <p><strong>{{ 'user.email' | transloco }}:</strong> {{ user.email }}</p>
   </section>
 
   <!-- Example Stats Table -->
   <section class="stats mb-4">
-    <h2>{{ 'stats.section.title' | translate }}</h2>
+    <h2>{{ 'stats.section.title' | transloco }}</h2>
     <table>
       <thead>
         <tr>
-          <th>{{ 'stats.metric' | translate }}</th>
-          <th>{{ 'stats.value' | translate }}</th>
+          <th>{{ 'stats.metric' | transloco }}</th>
+          <th>{{ 'stats.value' | transloco }}</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let item of stats">
-          <td>{{ item.label | translate }}</td>
+          <td>{{ item.label | transloco }}</td>
           <td>{{ item.value }}</td>
         </tr>
       </tbody>
@@ -32,14 +32,14 @@
 
   <!-- Transactions -->
   <section class="transactions mb-4">
-    <h2>{{ 'transactions.title' | translate }}</h2>
+    <h2>{{ 'transactions.title' | transloco }}</h2>
     <div class="transactions-list">
       <div class="transaction-item" *ngFor="let transaction of transactions">
-        <p><strong>{{ 'transactions.item' | translate }}:</strong> {{ transaction.item }}</p>
-        <p><strong>{{ 'transactions.date' | translate }}:</strong> {{ transaction.date | date:'mediumDate' }}</p>
-        <p><strong>{{ 'transactions.price' | translate }}:</strong> {{ transaction.price | currency }}</p>
-        <p><strong>{{ 'transactions.quantity' | translate }}:</strong> {{ transaction.quantity }}</p>
-        <p><strong>{{ 'transactions.total' | translate }}:</strong> {{ getTotal(transaction) | currency }}</p>
+        <p><strong>{{ 'transactions.item' | transloco }}:</strong> {{ transaction.item }}</p>
+        <p><strong>{{ 'transactions.date' | transloco }}:</strong> {{ transaction.date | date:'mediumDate' }}</p>
+        <p><strong>{{ 'transactions.price' | transloco }}:</strong> {{ transaction.price | currency }}</p>
+        <p><strong>{{ 'transactions.quantity' | transloco }}:</strong> {{ transaction.quantity }}</p>
+        <p><strong>{{ 'transactions.total' | transloco }}:</strong> {{ getTotal(transaction) | currency }}</p>
       </div>
     </div>
   </section>
@@ -47,11 +47,11 @@
   <!-- Toggleable Info -->
   <section class="more-info">
     <button class="mb-3" (click)="toggleInfo()">
-      {{ showMoreInfo ? ('button.hideMore' | translate) : ('button.showMore' | translate) }}
+      {{ showMoreInfo ? ('button.hideMore' | transloco) : ('button.showMore' | transloco) }}
     </button>
     <div *ngIf="showMoreInfo" class="mt-3">
-      <h3>{{ 'moreInfo.title' | translate }}</h3>
-      <p>{{ 'moreInfo.description' | translate }}</p>
+      <h3>{{ 'moreInfo.title' | transloco }}</h3>
+      <p>{{ 'moreInfo.description' | transloco }}</p>
     </div>
   </section>
 </div>

@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { BctTranslationService } from 'bct-applications-platform-translation';
+import { TranslocoService } from '@jsverse/transloco';
 import { WebVitalsService } from './performance/web-vitals.service';
 
 @Component({
@@ -9,7 +9,7 @@ import { WebVitalsService } from './performance/web-vitals.service';
 })
 export class AppComponent implements OnInit {
   constructor(
-    private translationService: BctTranslationService,
+    private translationService: TranslocoService,
     private webVitalsService: WebVitalsService
   ) {}
 
@@ -18,7 +18,7 @@ export class AppComponent implements OnInit {
     this.webVitalsService.measureAll();
     
     // Initialize translations
-    this.translationService.setLanguage('en-US').subscribe();
+    this.translationService.setActiveLang('en-US');
   }
 
   showMoreInfo = false;
