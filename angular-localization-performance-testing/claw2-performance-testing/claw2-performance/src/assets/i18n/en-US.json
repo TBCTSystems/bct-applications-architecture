@@ -1,0 +1,39 @@
+{
+    "app": {
+      "title": "Performance Testing App",
+      "description": "This is a sample Angular app demonstrating ngx-translate."
+    },
+    "user": {
+      "section.title": "User Information",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email"
+    },
+    "stats": {
+      "section.title": "Performance Stats",
+      "metric": "Metric",
+      "value": "Value",
+      "totalUsers": "Total Users",
+      "activeSessions": "Active Sessions",
+      "responseTime": "Response Time",
+      "totalRevenue": "Total Revenue",
+      "date": "Date"
+    },
+    "transactions": {
+      "title": "Transactions",
+      "item": "Item",
+      "date": "Date",
+      "price": "Price",
+      "quantity": "Quantity",
+      "total": "Total"
+    },
+    "button": {
+      "showMore": "Show More",
+      "hideMore": "Hide More"
+    },
+    "moreInfo": {
+      "title": "Additional Information",
+      "description": "Here you can find extra information about the app."
+    }
+  }
+  

@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { BctTranslationService } from 'bct-applications-platform-translation';
 import { WebVitalsService } from './performance/web-vitals.service';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-root',
@@ -9,20 +9,20 @@ import { WebVitalsService } from './performance/web-vitals.service';
 })
 export class AppComponent implements OnInit {
   constructor(
-    private translationService: BctTranslationService,
+    private translationService: TranslateService,
     private webVitalsService: WebVitalsService
-  ) {}
+  ) { }
 
   ngOnInit() {
+    this.translationService.setDefaultLang('en-US');
+    this.translationService.use('en-US');
+
     // Start measuring performance metrics
     this.webVitalsService.measureAll();
-    
-    // Initialize translations
-    this.translationService.setLanguage('en-US').subscribe();
   }
 
   showMoreInfo = false;
-  
+
   stats = [
     { label: 'stats.totalUsers', value: '1234' },
     { label: 'stats.activeSessions', value: '56' },
@@ -78,5 +78,9 @@ export class AppComponent implements OnInit {
 
   toggleInfo() {
     this.showMoreInfo = !this.showMoreInfo;
+  }
+
+  changeLanguage(lang: string) {
+    this.translationService.use(lang);
   }
 }

@@ -1,0 +1,38 @@
+{
+    "app": {
+        "title": "Aplicación de Pruebas de Rendimiento",
+        "description": "Esta es una aplicación de Angular de muestra que demuestra ngx-translate."
+    },
+    "user": {
+        "section.title": "Información del Usuario",
+        "firstName": "Nombre",
+        "lastName": "Apellido",
+        "email": "Correo Electrónico"
+    },
+    "stats": {
+        "section.title": "Estadísticas de Rendimiento",
+        "metric": "Métrica",
+        "value": "Valor",
+        "totalUsers": "Usuarios Totales",
+        "activeSessions": "Sesiones Activas",
+        "responseTime": "Tiempo de Respuesta",
+        "totalRevenue": "Ingresos Totales",
+        "date": "Fecha"
+    },
+    "transactions": {
+        "title": "Transacciones",
+        "item": "Artículo",
+        "date": "Fecha",
+        "price": "Precio",
+        "quantity": "Cantidad",
+        "total": "Total"
+    },
+    "button": {
+        "showMore": "Mostrar Más",
+        "hideMore": "Ocultar"
+    },
+    "moreInfo": {
+        "title": "Información Adicional",
+        "description": "Aquí puedes encontrar información adicional sobre la aplicación."
+    }
+}
