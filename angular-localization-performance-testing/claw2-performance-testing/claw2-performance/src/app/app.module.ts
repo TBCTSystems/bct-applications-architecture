@@ -8,6 +8,7 @@ import { TranslocoModule, TRANSLOCO_CONFIG, translocoConfig, TRANSLOCO_LOADER,
   TRANSLOCO_INTERCEPTOR, DefaultInterceptor,
   DefaultFallbackStrategy, TRANSLOCO_FALLBACK_STRATEGY 
 } from '@jsverse/transloco';
+import { TranslocoLocaleModule, provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { Injectable } from '@angular/core';
 
 import { AppComponent } from './app.component';
@@ -26,7 +27,8 @@ export class TranslocoHttpLoader {
   imports: [
     BrowserModule,
     HttpClientModule,
-    TranslocoModule
+    TranslocoModule,
+    TranslocoLocaleModule,
   ],
   providers: [
     {
@@ -59,6 +61,7 @@ export class TranslocoHttpLoader {
       provide: TRANSLOCO_FALLBACK_STRATEGY, // Use the default fallback strategy
       useClass: DefaultFallbackStrategy
     },
+    provideTranslocoLocale(),
     WebVitalsService,
   ],
   bootstrap: [AppComponent]

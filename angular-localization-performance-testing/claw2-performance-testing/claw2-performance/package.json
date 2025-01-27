@@ -19,6 +19,8 @@
     "@angular/platform-browser-dynamic": "~18.0.2",
     "@angular/router": "~18.0.2",
     "@jsverse/transloco": "^7.5.1",
+    "@jsverse/transloco-locale": "^7.0.1",
+    "@jsverse/transloco-messageformat": "^7.0.1",
     "crypto-js": "^4.2.0",
     "minio-js-browser": "^1.0.0",
     "rxjs": "~7.8.0",
