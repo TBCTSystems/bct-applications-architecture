@@ -74,7 +74,7 @@ We collected **100 runs** per library. Below are tables of **Min**, **Max**, **A
 
 The results for the 100 iterations are available here: [`metrics.csv`](./results/localization-metrics-for-angular-libraries.xlsx)
 
-### 3.1. TTFB (ms)
+### TTFB (ms)
 
 | **Measure** | **CLAW**         | **localize**       | **ngx-translate**   | **transloco**        |
 |:-----------:|:----------------:|:------------------:|:-------------------:|:--------------------:|
@@ -84,7 +84,7 @@ The results for the 100 iterations are available here: [`metrics.csv`](./results
 | **Median**  | 4.6 (good)       | 5.0 (good)         | 4.5 (good)          | 4.7 (good)           |
 | **SD**   | 1.2              | 1.7                | 1.1                 | 1.4                  |
 
-### 3.2. FCP (ms)
+### FCP (ms)
 
 | **Measure** | **CLAW**         | **localize**       | **ngx-translate**   | **transloco**        |
 |:-----------:|:----------------:|:------------------:|:-------------------:|:--------------------:|
@@ -94,7 +94,7 @@ The results for the 100 iterations are available here: [`metrics.csv`](./results
 | **Median**  | 99.0 (good)      | 95.7 (good)        | 89.2 (good)         | 105.9 (good)         |
 | **SD**   | 21.9             | 21.9               | 16.6                | 23.7                 |
 
-### 3.3. LCP (ms)
+### LCP (ms)
 
 | **Measure** | **CLAW**         | **localize**       | **ngx-translate**   | **transloco**        |
 |:-----------:|:----------------:|:------------------:|:-------------------:|:--------------------:|
