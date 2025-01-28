@@ -187,4 +187,7 @@ Conversely, if your application benefits from **compile-time translations**, **m
 ---
 
 ## 6. Spike Files
-TBA
+
+- [`$localize`](./libs/localize/localize.md)
+- [`transloco`](./libs/transloco.md)
+- [`ngx-translate`](./libs/ngx-translate.md)
