@@ -28,7 +28,7 @@ All results below fall **well under** 2500 ms and thus are rated **(good)**.
    - Metrics were gathered using the [`web-vitals`](https://github.com/GoogleChrome/web-vitals) library in the Angular app.
 
 2. **Script**  
-   - We have a Node.js script [`metric-collector.js`](./metric-collector.js) that:
+   - We have a Node.js script [`metric-collector.js`](../src/scripts//metric-collector.js) that:
      1. Opens a headless browser at `http://localhost:4200`.  
      2. Listens for console logs of `"METRIC FCP:"`, `"METRIC LCP:"`, and `"METRIC TTFB:"`.  
      3. Parses the numeric `value` from each metric.  
