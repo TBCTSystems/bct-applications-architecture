@@ -75,6 +75,8 @@ We collected **100 runs** per library. Below are tables of **Min**, **Max**, **A
 The results for the 100 iterations are available here: [`metrics.csv`](./results/localization-metrics-for-angular-libraries.xlsx)
 
 ### TTFB (ms)
+   - All three libraries (localize, ngx-translate, transloco) have very low TTFB, well under 15 ms.  
+   - Differences here are minimal; all are considered `(good)` in a typical local environment.
 
 | **Measure** | **CLAW**         | **localize**       | **ngx-translate**   | **transloco**        |
 |:-----------:|:----------------:|:------------------:|:-------------------:|:--------------------:|
@@ -85,6 +87,9 @@ The results for the 100 iterations are available here: [`metrics.csv`](./results
 | **SD**   | 1.2              | 1.7                | 1.1                 | 1.4                  |
 
 ### FCP (ms)
+
+   - **ngx-translate** appears to have the fastest (lowest) average (~89 ms) and median (~89 ms).  
+   - **localize** and **transloco** are close behind, with localize near ~94 ms and transloco around ~106 ms.
 
 | **Measure** | **CLAW**         | **localize**       | **ngx-translate**   | **transloco**        |
 |:-----------:|:----------------:|:------------------:|:-------------------:|:--------------------:|
@@ -104,28 +109,11 @@ The results for the 100 iterations are available here: [`metrics.csv`](./results
 | **Median**  | 99.1 (good)      | 95.9 (good)        | 97.3 (good)         | 120.3 (good)         |
 | **SD**   | 30.1             | 53.6               | 21.9                | 28.9                 |
 
-> **Note**: All metrics are comfortably below 2500 ms, so each measurement is considered **(good)** according to typical Web Vitals guidelines.
-
-### 3.1. Interpretation
-
-Based on the collected data:
-
-1. **TTFB**  
-   - All three libraries (localize, ngx-translate, transloco) have very low TTFB, well under 15 ms.  
-   - Differences here are minimal; all are considered `(good)` in a typical local environment.
-
-2. **FCP**  
-   - **ngx-translate** appears to have the fastest (lowest) average (~89 ms) and median (~89 ms).  
-   - **localize** and **transloco** are close behind, with localize near ~94 ms and transloco around ~106 ms.
-
-3. **LCP**  
    - **localize** has a notable outlier (581.8 ms) but otherwise is around ~95–100 ms median.  
    - **transloco** has a higher median (~120 ms) and average (~124 ms) than the other two, but still considered `(good)` under 2500 ms.  
    - **ngx-translate** is near ~100 ms on average, with fewer extreme outliers.
 
-Overall, **ngx-translate** shows slightly better FCP, while **localize** and **transloco** are very close in practical terms. All are well within **“good”** thresholds.
-
----
+> **Note**: All metrics are comfortably below 2500 ms, so each measurement is considered **(good)** according to typical Web Vitals guidelines. Overall, **ngx-translate** shows slightly better FCP, while **localize** and **transloco** are very close in practical terms. All are well within **“good”** thresholds.
 
 ### 3.2. Visualizations
 
