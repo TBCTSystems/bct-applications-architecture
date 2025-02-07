@@ -1,0 +1,100 @@
+# Ignore Visual Studio specific files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider specific files
+.idea/
+*.iml
+out/
+
+# Ignore build outputs
+bin/
+obj/
+[Oo]ut/
+*.exe
+*.dll
+*.pdb
+*.app/
+
+# Ignore user-specific files
+*.rsuser
+*.sln*
+*.dotCover
+*.log
+
+# Ignore NuGet packages
+*.nupkg
+*.snupkg
+packages/
+!packages/repositories.config
+
+# Ignore environment-related files
+*.env.local
+
+# Ignore secrets and sensitive files
+secrets.json
+appsettings.Development.json
+appsettings.local.json
+UserSecrets/
+
+# Ignore logs and debug files
+*.log
+logs/
+*.cache
+
+# Ignore Docker files
+docker-compose.override.yml
+**/Dockerfile
+**/docker-compose*.yml
+
+# Ignore Rider workspace & config files
+.idea/
+*.ipr
+*.iws
+.idea_modules/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/sonarlint/
+.idea/httpRequests/
+.idea/libraries/
+.idea/shelf/
+
+# Ignore ReSharper & Rider caches
+.ReSharper*/
+*.DotSettings.user
+resharper.xml
+syntax.xml
+
+# Ignore coverage & test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+
+# Ignore local database files
+*.mdf
+*.ldf
+sqlite.db
+
+# Ignore compiled Blazor/WebAssembly files (if applicable)
+wwwroot/css/
+wwwroot/js/
+dist/
+node_modules/
+
+# Ignore temporary files
+*.bak
+*.swp
+*.swo
+*.swn
+
+# Ignore Rider plugins and local settings
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/sonarlint/
+

@@ -1,0 +1,14 @@
+services:
+  vault:
+    image: hashicorp/vault:latest
+    container_name: vault_dev
+    ports:
+      - "${VAULT_PORT}:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID}
+    cap_add:
+      - IPC_LOCK
+    command: >
+      server -dev
+      -dev-root-token-id=${VAULT_DEV_ROOT_TOKEN_ID}
+      -dev-listen-address=0.0.0.0:${VAULT_PORT}
