@@ -1,0 +1,15 @@
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
+CN = OpenBao Server
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost   	# Replace with your domain
+IP.1 = 127.0.0.1       # Replace with your server IP

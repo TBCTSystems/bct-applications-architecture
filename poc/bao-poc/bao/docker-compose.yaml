@@ -1,0 +1,34 @@
+services:
+  openbao:
+    image: quay.io/openbao/openbao:2.1.1
+    container_name: bao
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    environment:
+      OPENBAO_LOG_LEVEL: "info"
+      OPENBAO_STORAGE_BACKEND: "memory" # Change as needed (e.g., `file`, `consul`, `etcd`)
+      OPENBAO_TLS_DISABLE: "false"    # Disable TLS for local development
+      VAULT_CACERT: "/bao/certs/ca.crt"
+      VAULT_CLIENT_CERT: "/bao/certs/client.crt"
+      VAULT_CLIENT_KEY: "/bao/certs/client.key"
+      VAULT_ADDR: "https://127.0.0.1:8200"     # needed?
+      VAULT_API_ADDR: "https://localhost:8200" # needed?
+
+    volumes:
+
+      - ./config:/bao/config
+      - ./certs:/bao/certs
+      - ./myapp-policy.hcl:/bao/myapp-policy.hcl
+      - bao_data:/bao/data
+      - ./data:/bao/data
+
+    command: >
+      bao server -config=/bao/config/config.hcl
+
+    restart: unless-stopped
+
+volumes:
+  bao_data:
+ 
