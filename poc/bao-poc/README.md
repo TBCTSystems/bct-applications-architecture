@@ -27,14 +27,14 @@ In production, you’d use valid certificates (signed by a known CA) and possibl
 ## 2. Directory Structure
 
 Beside **`src`** for the .NET demo app, We’ll create a base `bao/` folder containing `certs/`, `config/` and `myapp-policy.hcl` . 
-- **`certs/`**: store working CAs, keys, certs for use. You should create your own certs per the [instruction](#generate-server-certificate).
+- **`certs/`**: store working CAs, keys, certs for use. The files in this folder are for reference only. You should create your own certs per the [instruction](#generate-server-certificate).
 - **`config/`**: `config.hcl` is bao configuration file.
 - **`myapp-policy.hcl`**: policy file granting .NET app access to secrets.
 - **`src/`**: a console app for demo only. It store a secret in OpenBao and retrieve it.
 
 ```plaintext
 └── src/                      (a .NET demo app)
-└── bao/                      (Vault config and certs in one place)
+└── bao/                      (bao config and certs in one place)
     ├── certs/                (store CA, server cert, client cert, etc.)
     ├── config/
         ├── config.hcl        (Bao configuration)
@@ -42,7 +42,7 @@ Beside **`src`** for the .NET demo app, We’ll create a base `bao/` folder cont
     └── docker-compose.yaml
 ```
 
-This is just to organize your Vault config and certs in one place.
+This is just to organize your bao config and certs in one place.
 
 ---
 
@@ -152,7 +152,7 @@ listener "tcp" {
 - `listener "tcp"`: Configures the OpenBao server’s TCP listener on port 8200.
     - `address: 0.0.0.0:8200` tells OpenBao to listen on all interfaces in the container (mapped to port 8200 on your host).
     - `tls_cert_file` / `tls_key_file`: The server certificate & private key (from your self-signed certs).
-    - `tls_client_ca_file`: Instructs Vault to request/verify client certificates signed by `client-ca.crt`. This is crucial for mTLS if you enable cert auth.
+    - `tls_client_ca_file`: Instructs OpenBao to request/verify client certificates signed by `client-ca.crt`. This is crucial for mTLS if you enable cert auth.
 - `storage "file"`: Uses local disk storage at `/bao/data`. Fine for a PoC, but for production, consider a more robust backend.
 
 
@@ -182,20 +182,20 @@ You should see something like:
 ---
 
 ### 5.2 Initialize & Unseal
-When running Vault in “production” mode, it starts off **sealed**. You need to initialize and then **unseal** it.
+When running OpenBao in “production” mode, it starts off **sealed**. You need to initialize and then **unseal** it.
 
 **Open a shell inside the container:**
 ```bash
-docker exec -it vault sh
+docker exec -it bao sh
 ```
 
 **Set environment variables so the Vault CLI can connect via HTTPS with your self-signed CA:**
 ```bash
 export VAULT_ADDR="https://127.0.0.1:8200"
-export VAULT_CACERT="/vault/config/certs/ca.crt"
+export VAULT_CACERT="/bao/config/certs/ca.crt"
 ```
 
-**Initialize Vault:**
+**Initialize OpenBao:**
 ```bash
 bao operator init
 ```
@@ -290,7 +290,7 @@ bao policy list
 Should now list `myapp-policy` among the policies.
 
 ### 6.2 Register the Client Certificate for Cert Auth
-To authenticate the .NET app via cert auth using (`client.crt`), register it so Vault knows which policy to assign:
+To authenticate the .NET app via cert auth using (`client.crt`), register it so OpenBao knows which policy to assign:
 
 ```bash
 bao write auth/cert/certs/myapp-cert \
