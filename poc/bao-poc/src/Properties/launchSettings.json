@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "openbaoPOC": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
