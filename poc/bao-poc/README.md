@@ -277,7 +277,21 @@ cert/                   cert    ...
 indicating that the "cert" auth method is enabled at `auth/cert/`.
 
 
-Now try to apply the policy again.
+### 6.2 Apply Policy `myapp-policy`
+
+A policy `myapp-policy.hcl` with the following content was pre-created in the `/bao` directory (If the file does not exist in the `/bao` directory, you need to copy it to docker.):
+```hcl
+path "secret/data/myapp/*" {
+  capabilities = ["create", "update", "read", "delete", "list"]
+}
+```
+
+This policy grants the ability to read and write any secrets stored at `secret/data/myapp/*`.
+
+Apply the policy:
+```bash
+bao policy write myapp-policy /bao/myapp-policy.hcl
+```
 
 **Verification:**
 ```bash
@@ -285,7 +299,7 @@ bao policy list
 ```
 Should now list `myapp-policy` among the policies.
 
-### 6.2 Register the Client Certificate for Cert Auth
+### 6.3 Register the Client Certificate for Cert Auth
 To authenticate the .NET app via cert auth using (`client.crt`), register it so OpenBao knows which policy to assign:
 
 ```bash
