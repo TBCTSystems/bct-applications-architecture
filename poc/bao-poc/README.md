@@ -1,16 +1,16 @@
-# Secure OpenBao Vault with Self-Signed TLS and .NET Certificate Authentication
+# Secure OpenBao with mTLS and .NET Certificate Authentication
 
-This guide walks you through setting up a local OpenBao Vault instance (in “production” mode) with **TLS** and **client certificate authentication**, then consuming secrets from a minimal **.NET** app **without** storing any OpenBao token in the code or environment variables.
+This guide walks you through setting up a local OpenBao instance (in “production” mode) with **TLS** and **client certificate authentication**, then consuming secrets from a minimal **.NET** app **without** storing any OpenBao token in the code or environment variables.
 
-In production, you’d use valid certificates (signed by a known CA) and possibly more sophisticated policies. But for a **proof-of-concept**, we’ll create a **self-signed** CA and see how OpenBao can do **mTLS** (mutual TLS).
+We create Server CA and client CA to sign server and client certificates to see how OpenBao can do **mTLS** (mutual TLS).
 
 ---
 ## Table of Contents
 1. [Introduction](#1-introduction)
 2. [Directory Structure](#2-directory-structure)
-3. [Generate Certificates (Self-Signed)](#3-generate-certificates-self-signed)
-4. [Prepare the Bao Configuration](#4-prepare-the-bao-configuration)
-5. [Start Bao & Unseal](#5-start-bao--unseal)
+3. [Generate TLS Certificates](#3-generate-tls-certificates)
+4. [Prepare OpenBao Configuration](#4-prepare-openbao-configuration)
+5. [Start OpenBao & Unseal](#5-start-openbao--unseal)
 6. [Enable Cert Auth & Create Policy](#6-enable-cert-auth--create-policy)
 7. [Run Console App](#run-the-demo)
 
@@ -26,31 +26,27 @@ In production, you’d use valid certificates (signed by a known CA) and possibl
 
 ## 2. Directory Structure
 
-Beside **`src`** for the .NET demo app, We’ll create a base `bao/` folder containing `certs/`, `config/` and `myapp-policy.hcl` . 
-- **`certs/`**: store working CAs, keys, certs for use. You should create your own certs per the [instruction](#generate-server-certificate).
-- **`config/`**: `config.hcl` is bao configuration file.
+Beside **`src/`** for the .NET demo app, We’ll create a base `bao/` folder containing `certs/`, `config/` and `myapp-policy.hcl` . 
+- **`certs/`**: store working CAs, keys, certs for use. The files in this folder are for reference only. You should create your own certs per the [instruction](#generate-server-certificate).
+- **`config/`**: `config.hcl` is OpenBao configuration file.
 - **`myapp-policy.hcl`**: policy file granting .NET app access to secrets.
 - **`src/`**: a console app for demo only. It store a secret in OpenBao and retrieve it.
 
 ```plaintext
 └── src/                      (a .NET demo app)
-└── bao/                      (Vault config and certs in one place)
+└── bao/                      (OpenBao config and certs in one place)
     ├── certs/                (store CA, server cert, client cert, etc.)
     ├── config/
-        ├── config.hcl        (Bao configuration)
+        ├── config.hcl        (OpenBao configuration)
     └── myapp-policy.hcl      (Policy file granting .NET app access to secrets)
     └── docker-compose.yaml
 ```
 
-This is just to organize your Vault config and certs in one place.
+This is just to organize your OpenBao config and certs in one place.
 
 ---
 
-## 3. Generate Certificates (Self-Signed)
-
-> ⚠️ This is only required if you don’t have real certificates from a trusted CA. In production, you’d get a valid certificate so users don’t have to manually trust your CA.
-
-## Generate TLS Certificates
+## 3. Generate TLS Certificates
 
 ### Create a Server Certificate Authority (CA)
 In PowerShell, navigate to a directory (e.g., `\bao\certs`).
@@ -125,7 +121,7 @@ openssl pkcs12 -export -inkey C:\OpenBao\certs\client.key -in C:\OpenBao\certs\c
 
 This creates a client.pfx file in C:\OpenBao\certs. 
 
-## 4. Prepare the Bao Configuration
+## 4. Prepare OpenBao Configuration
 1. Create a configuration file (`\bao\config\config.hcl`). This file tells OpenBao:
 - **Where to listen** and how to serve TLS.
 - **Where to store** its data (in our case, the local file system).
@@ -152,11 +148,11 @@ listener "tcp" {
 - `listener "tcp"`: Configures the OpenBao server’s TCP listener on port 8200.
     - `address: 0.0.0.0:8200` tells OpenBao to listen on all interfaces in the container (mapped to port 8200 on your host).
     - `tls_cert_file` / `tls_key_file`: The server certificate & private key (from your self-signed certs).
-    - `tls_client_ca_file`: Instructs Vault to request/verify client certificates signed by `client-ca.crt`. This is crucial for mTLS if you enable cert auth.
+    - `tls_client_ca_file`: Instructs OpenBao to request/verify client certificates signed by `client-ca.crt`. This is crucial for mTLS if you enable cert auth.
 - `storage "file"`: Uses local disk storage at `/bao/data`. Fine for a PoC, but for production, consider a more robust backend.
 
 
-## 5. Start Bao & Unseal
+## 5. Start OpenBao & Unseal
 
 ### 5.1 Navigate to the folder containing `docker-compose.yaml`. Launch bao in the background:
 
@@ -182,20 +178,20 @@ You should see something like:
 ---
 
 ### 5.2 Initialize & Unseal
-When running Vault in “production” mode, it starts off **sealed**. You need to initialize and then **unseal** it.
+When running OpenBao in “production” mode, it starts off **sealed**. You need to initialize and then **unseal** it.
 
 **Open a shell inside the container:**
 ```bash
-docker exec -it vault sh
+docker exec -it bao sh
 ```
 
 **Set environment variables so the Vault CLI can connect via HTTPS with your self-signed CA:**
 ```bash
 export VAULT_ADDR="https://127.0.0.1:8200"
-export VAULT_CACERT="/vault/config/certs/ca.crt"
+export VAULT_CACERT="/bao/config/certs/ca.crt"
 ```
 
-**Initialize Vault:**
+**Initialize OpenBao:**
 ```bash
 bao operator init
 ```
@@ -252,7 +248,7 @@ After this, OpenBao is **running, unsealed**, and you can proceed to enable cert
 
 ## 6. Enable Cert Auth & Create Policy
 
-Before proceeding, ensure you are **logged in** to bao (with the root token or a token that can manage auth methods/policies):
+Before proceeding, ensure you are **logged in** to OpenBao (with the root token or a token that can manage auth methods/policies):
 ```bash
 bao token lookup
 ````
@@ -281,7 +277,21 @@ cert/                   cert    ...
 indicating that the "cert" auth method is enabled at `auth/cert/`.
 
 
-Now try to apply the policy again.
+### 6.2 Apply Policy `myapp-policy`
+
+A policy `myapp-policy.hcl` with the following content was pre-created in the `/bao` directory (If the file does not exist in the `/bao` directory, you need to copy it to docker.):
+```hcl
+path "secret/data/myapp/*" {
+  capabilities = ["create", "update", "read", "delete", "list"]
+}
+```
+
+This policy grants the ability to read and write any secrets stored at `secret/data/myapp/*`.
+
+Apply the policy:
+```bash
+bao policy write myapp-policy /bao/myapp-policy.hcl
+```
 
 **Verification:**
 ```bash
@@ -289,8 +299,8 @@ bao policy list
 ```
 Should now list `myapp-policy` among the policies.
 
-### 6.2 Register the Client Certificate for Cert Auth
-To authenticate the .NET app via cert auth using (`client.crt`), register it so Vault knows which policy to assign:
+### 6.3 Register the Client Certificate for Cert Auth
+To authenticate the .NET app via cert auth using (`client.crt`), register it so OpenBao knows which policy to assign:
 
 ```bash
 bao write auth/cert/certs/myapp-cert \
@@ -304,7 +314,7 @@ Any client connecting with a cert matching `client.crt` (and signed by your CA) 
 
 **Verification:**
 ```bash
-bao read auth/cert/certs/myapp-cert
+  bao read auth/cert/certs/myapp-cert
 ```
 You should see a JSON response with details of the certificate name and policy mapping.
 
@@ -322,9 +332,9 @@ Navigate to the `src` folder, then `Set client certificate`:
 ```powershell
 $env:CLIENT_CERT_PATH = "..\bao\certs\client.pfx" 
 ```
-Note: in case the client.pfx was created with a password, the password (e.g. `xxxxxx`) also need to be set:
+Note: in case the client.pfx was created with a password, the password (e.g. `pfxpassword`) also need to be set:
 ```powershell
-$env:CLIENT_CERT_PASSWORD = "xxxxxx"
+$env:CLIENT_CERT_PASSWORD = "pfxpassword"
 ```
 
 **The app will securely store a key/value pair to OpenBao and retrieve it:**
