@@ -19,3 +19,8 @@ services:
 
 volumes:
   vault-file:
+
+#### Important parts ####
+# Mounting `vault.hcl` and `./certs` into the container so Vault sees them at `/vault/config`.
+# Exposing port `8200` on the host for Vault’s HTTPS endpoint.
+# Using a named volume `vault-file` for Vault’s file storage.
