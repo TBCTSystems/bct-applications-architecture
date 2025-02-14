@@ -4,8 +4,7 @@
 This repository serves as a **proof of concept (POC)** for using HashiCorp Vault to manage secrets securely. It contains documentation and example implementations covering authentication, secret storage, encryption, and best practices.
 
 ## Documentation
-Below are links to the main sections of this repository:
-
+### Introduction To Vault
 - [Overview](docs/vault-basics/1.overview.md) - Introduction to Vault and its purpose.
 - [Introduction to Commands](docs/vault-basics/2.commands-intro.md) - Covers basic command structure and usage.
 - [Authentication](docs/vault-basics/3.authentication.md) - Explains authentication methods, creating users, AppRole, and certificate-based authentication.
@@ -14,15 +13,10 @@ Below are links to the main sections of this repository:
 - [Secrets Engine](docs/vault-basics/6.secrets-engine.md) - Provides an overview of various secrets engines, their use cases, and configuration.
 - [Vault Leases](docs/vault-basics/7.lease) - Explains lease management for dynamic secrets (to be added).
 
-## TODOs
-- Extract Vault service into a shared project that can be used by multiple implementations.
-- Add CLI instructions to populate Vault with required secrets.
+### Other Topics
 
-## Accessing Secrets
-This [directory](src/AccessSecrets) contains examples of how to access secrets from Vault using **VaultSharp** and **Token Authentication**.
+- [Generate self-signed certificates](docs/miscellaneous/self-signed-certs.md)
+- [Configure, start, and unseal Vault using docker](docs/miscellaneous/start-and-unseal.md)
+- [Dotnet Examples](docs/dotnet/dotnet-and-vault.md)
 
-**Note:** Secrets must be added to Vault before running the app.
-
-## Secure HashiCorp Vault with Self-Signed TLS and .NET Certificate Authentication
-This [markdown](src/TLSAuthV2/README.md) provides a step-by-step guide for authenticating a .NET 9 app using self-signed certificates.
 
