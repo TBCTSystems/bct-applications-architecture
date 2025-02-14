@@ -1,14 +1,29 @@
 services:
   vault:
     image: hashicorp/vault:latest
-    container_name: vault_dev
+    container_name: vault
+    # We mount the entire config folder into /vault/config
+    volumes:
+      - ./vault/config:/vault/config # Mount Vault config file
+      - ./certs:/certs # Mount local TLS certs directory
+      - ./vault/policies:/vault/policies # Mount a local policies folder.
+      - vault-file:/vault/file # Use a named volume for Vault’s file storage
     ports:
-      - "${VAULT_PORT}:8200"
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID}
+      - "8200:8200"
     cap_add:
       - IPC_LOCK
+    environment:
+      # Optional, but recommended, so Vault knows how it should refer to itself
+      VAULT_ADR: "https://127.0.0.1:8200"
+      VAULT_API_ADDR: "https://localhost:8200"
+      VAULT_SKIP_VERIFY: true # For demo purposes/development only, when self-signed certs are used
     command: >
-      server -dev
-      -dev-root-token-id=${VAULT_DEV_ROOT_TOKEN_ID}
-      -dev-listen-address=0.0.0.0:${VAULT_PORT}
+      vault server -config=/vault/config/vault.hcl
+
+volumes:
+  vault-file:
+
+#### Important parts ####
+# Mounting `vault.hcl` and `./certs` into the container so Vault sees them at `/vault/config`.
+# Exposing port `8200` on the host for Vault’s HTTPS endpoint.
+# Using a named volume `vault-file` for Vault’s file storage.
