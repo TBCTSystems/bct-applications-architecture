@@ -49,7 +49,7 @@ builder.Services.AddSingleton(new VaultClientFactory().CreateVaultClient(vaultCo
 
 The .NET app can authenticate itself with Vault via various methods, which are discussed below. We will be using the policy provided in [dotnet-app-policy.hcl](../../devtools/vault/config/vault.hcl) so that the app can read and write certificates into Vault.
 
-> Do not forget to update `appsettings.json`
+> ⚠️ Do not forget to update `appsettings.json` with the credentials/tokens/etc.
 
 ### 3.1. Create a New Policy (dotnet-app-policy)
 We need to create a policy with capabilities such as reading and writing secrets.
@@ -110,4 +110,108 @@ vault write auth/cert/certs/dotnet-app \
 ```
 
 ## 4. Interacting with Vault Using VaultSharp
-To be updated (the code has been cleaned up and working!)
+
+### Overview
+VaultSharp is a .NET client for interacting with HashiCorp Vault. The [VaultService.cs](../../src/VaultDemo.Console/Services/VaultService.cs) class in this project is responsible for securely reading and writing secrets using Vault's Key-Value v2 engine.
+
+See the implementation in [VaultService.cs](../../src/VaultDemo.Console/Services/VaultService.cs).
+
+### Key Methods Explained
+
+#### Reading a Secret
+```csharp
+var secret = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(path, mountPoint: "secret");
+```
+This retrieves a secret from Vault's **KV v2 engine** at the given `path`. The `mountPoint` parameter specifies where the KV engine is enabled (`secret` in this case).
+
+#### Retrieving a Specific Key
+```csharp
+var value = secret.Data.Data.ContainsKey(key) ? secret.Data.Data[key]?.ToString() : null;
+```
+After reading the secret, this checks if the specified `key` exists in the response and extracts its value.
+
+#### Writing a Secret
+```csharp
+var data = new Dictionary<string, object>
+{
+    { key, typeof(T) == typeof(string) ? value : JsonSerializer.Serialize(value) }
+};
+await vaultClient.V1.Secrets.KeyValue.V2.WriteSecretAsync(path, data, mountPoint: "secret");
+```
+This constructs a dictionary with the `key-value` pair and writes it to Vault. If the value is not a string, it is serialized to JSON before storage.
+
+#### Error Handling
+```csharp
+catch (Exception ex)
+{
+    logger.LogError("Error fetching secret from Vault. Path: {SecretPath}, Key: {SecretKey}, Exception {Message}",
+        path, key, ex.Message);
+    return default;
+}
+```
+All operations are wrapped in `try-catch` blocks, and errors are logged for troubleshooting.
+
+### Summary
+- **Secrets are stored and retrieved using VaultSharp’s KV v2 methods.**
+- **Vault interaction is encapsulated in `VaultService` to keep secret handling isolated from the main application logic.**
+- **Logging is used for debugging and error tracking.**
+
+### Vault Client Factory
+
+The [VaultClientFactory.cs](../../src/VaultDemo.Console/Factories/VaultClientFactory.cs) class is responsible for creating an `IVaultClient` instance based on the selected authentication method. It supports multiple Vault authentication mechanisms, including Token, UserPass, AppRole, and TLS Certificate-based authentication. Additionally, it allows disabling SSL verification for development environments using self-signed certificates.
+
+See implementation in [VaultClientFactory.cs](../../src/VaultDemo.Console/Factories/VaultClientFactory.cs).
+
+### Service Registration
+
+The `VaultClientFactory` and `VaultService` are registered in the application's dependency injection container, allowing them to be injected into other services.
+
+#### Key Points:
+
+- **Vault client registration**: The factory is used to create an `IVaultClient` instance, which is registered as a singleton.
+- **Vault service registration**: The `VaultService` is registered to interact with secrets stored in Vault.
+- **Logging integration**: Serilog is configured to log messages to the console.
+
+#### Code Example:
+
+```csharp
+// Register Vault client as a singleton
+builder.Services.AddSingleton(new VaultClientFactory().CreateVaultClient(vaultConfig));
+
+// Register Vault service
+builder.Services.AddSingleton<IVaultService, VaultService>();
+```
+
+### Building and Running the Application
+
+To build and run the application using the .NET CLI, use the following commands:
+
+```sh
+# Restore dependencies
+ dotnet restore
+
+# Build the project
+ dotnet build
+
+# Run the application
+ dotnet run
+```
+
+#### Important Notes:
+
+- If you have generated a **new certificate**, update the `client.pfx` file under `Certs`.
+- Ensure it is copied to the target output directory by including the following configuration in your `.csproj` file:
+
+```xml
+<ItemGroup>
+  <None Remove="appsettings.json" />
+  <Content Include="appsettings.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </Content>
+  <None Update="Certs\client.pfx">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
+</ItemGroup>
+```
+
+
