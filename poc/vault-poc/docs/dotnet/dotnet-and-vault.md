@@ -111,12 +111,9 @@ vault write auth/cert/certs/dotnet-app \
 
 ## 4. Interacting with Vault Using VaultSharp
 
-### Overview
 VaultSharp is a .NET client for interacting with HashiCorp Vault. The [VaultService.cs](../../src/VaultDemo.Console/Services/VaultService.cs) class in this project is responsible for securely reading and writing secrets using Vault's Key-Value v2 engine.
 
-See the implementation in [VaultService.cs](../../src/VaultDemo.Console/Services/VaultService.cs).
-
-### Key Methods Explained
+### 4.1. Key Methods Explained
 
 #### Reading a Secret
 ```csharp
@@ -151,18 +148,11 @@ catch (Exception ex)
 ```
 All operations are wrapped in `try-catch` blocks, and errors are logged for troubleshooting.
 
-### Summary
-- **Secrets are stored and retrieved using VaultSharp’s KV v2 methods.**
-- **Vault interaction is encapsulated in `VaultService` to keep secret handling isolated from the main application logic.**
-- **Logging is used for debugging and error tracking.**
-
-### Vault Client Factory
+### 4.2. Vault Client Factory
 
 The [VaultClientFactory.cs](../../src/VaultDemo.Console/Factories/VaultClientFactory.cs) class is responsible for creating an `IVaultClient` instance based on the selected authentication method. It supports multiple Vault authentication mechanisms, including Token, UserPass, AppRole, and TLS Certificate-based authentication. Additionally, it allows disabling SSL verification for development environments using self-signed certificates.
 
-See implementation in [VaultClientFactory.cs](../../src/VaultDemo.Console/Factories/VaultClientFactory.cs).
-
-### Service Registration
+### 4.3. Service Registration
 
 The `VaultClientFactory` and `VaultService` are registered in the application's dependency injection container, allowing them to be injected into other services.
 
@@ -182,7 +172,7 @@ builder.Services.AddSingleton(new VaultClientFactory().CreateVaultClient(vaultCo
 builder.Services.AddSingleton<IVaultService, VaultService>();
 ```
 
-### Building and Running the Application
+### 4.4. Building and Running the Application
 
 To build and run the application using the .NET CLI, use the following commands:
 
