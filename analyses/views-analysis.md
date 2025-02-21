@@ -268,43 +268,6 @@ flowchart TD
     class A,B,C,D,E,F,G,H process;
 ```
 
-#### Column Mapping Architecture
-```mermaid
-%%{init: {"flowchart": {"htmlLabels": false}} }%%
-flowchart LR
-    classDef default fill:#F8F8FF,stroke:#696969,stroke-width:1.5px,color:#000000,font-family:Arial,font-size:12pt;
-    classDef process rounded;
-    classDef decision diamond;
-    classDef data parallelogram;
-
-    subgraph ColumnMappers
-        B[Base Column Mapper]
-        D[Device Column Mapper]
-        T[TRAC Mapper]
-        TA[TACE Mapper]
-        TI[TIS Mapper]
-    end
-
-    subgraph ColumnTypes
-        S[/Static Data/]
-        E[/Events Data/]
-        C[/Computed Data/]
-    end
-
-    subgraph Database
-        V[(View Data)]
-        EV[(Events Data)]
-    end
-
-    B --> D
-    D --> T & TA & TI
-    T & TA & TI --> S & E & C
-    S & E & C --> V & EV
-
-    class B,D,T,TA,TI process;
-    class S,E,C data;
-```
-
 #### Data Transformation Flow
 ```mermaid
 %%{init: {"flowchart": {"htmlLabels": false}} }%%
