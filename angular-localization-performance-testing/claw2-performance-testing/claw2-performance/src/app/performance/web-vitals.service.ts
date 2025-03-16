@@ -24,14 +24,9 @@ export class WebVitalsService {
   ttfbMetric$ = this.ttfbMetric.asObservable();
 
   private logMetric(metricName: string, metric: Metric) {
-    console.log(`${metricName}:`, {
-      name: metric.name,
-      value: metric.value,
-      rating: metric.rating,
-      delta: metric.delta,
-      id: metric.id,
-      navigationType: metric.navigationType
-    });
+    // Instead of console.log('METRIC FCP:', metric),
+    // build a single string with JSON.stringify():
+    console.log(`METRIC ${metricName}: ${JSON.stringify(metric)}`);
   }
 
   private createMetricObject(metric: Metric): PerformanceMetric {
