@@ -1,4 +1,4 @@
-# Use of KeyValut to Eliminate Credential Exposure in Lumia Docker Container
+# Use of KeyVault to Eliminate Credential Exposure in Lumia Docker Container
 
 * Status: **Accepted**  
 * Deciders: BCT Architecture Team
