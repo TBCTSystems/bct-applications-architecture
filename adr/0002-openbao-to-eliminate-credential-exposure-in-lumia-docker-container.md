@@ -19,7 +19,7 @@ The Lumia application, running as a Docker container, requires access to sensiti
 * Enable integration with authentication methods (certs, AppRole)
 * Support for templating and secret rendering
 * Lightweight and container-friendly secret management solution
-
+* Limited modifications to the established code base.
 ## Considered Options
 
 * OpenBao
