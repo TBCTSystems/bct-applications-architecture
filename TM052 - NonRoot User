@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant Client as Reveos (Has Client Cert)
+    participant Server as Server (TLS_DH_anon_WITH_AES_256_CBC_SHA)
+
+    note over Server: TLS 1.2, Anonymous Cipher SuiteNo server cert, no client cert request
+    Client->>Server: ClientHello
+    Server-->>Client: ServerHello(anon cipher suite selected)
+    Server-->>Client: ServerKeyExchange (DH params for anon)
+    note over Server: No ServerCertificate(RFC 5246 7.4.2: "Server certificate message is omitted if ananonymous cipher suite is negotiated.")
+    note over Server: No CertificateRequest(RFC 5246 §7.4.4: "Client certificates are not requested for anonymous ciphers.")
+
+    Client-->>Server: ClientKeyExchange
+    Client-->>Server: [Finished]
+    Server-->>Client: [Finished]
+
+    note over Client,Server: Encrypted Channel Established</b>Anonymous handshake: No server or client auth
