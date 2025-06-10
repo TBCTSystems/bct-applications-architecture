@@ -39,14 +39,18 @@ Chosen option: ...
 
 * Good because it allows for automatic incorporation of bug fixes and security patches without changing the minor version.
 * Good because it minimizes disruption to the development and operation teams while still allowing for some flexibility.
+* Bad because multiple libraries may depend on different floating versions of the same package, leading to version conflicts. Legacy configurations that contain hard-coded bindings can further complicate this scenario, making dependency resolution challenging.
 * Bad because minor updates could introduce unforeseen bugs or compatibility issues, leading to possible runtime errors.
 * Bad because due to human factor sometimes breaking changes are introduced in a new patch and this completely stops development in the repository until it is fixed - We have seen examples of such changes for both Terumo packages and external products.
+* Bad because legacy projects with specific assembly bindings in `web.config` may encounter conflicts if floating versions introduce incompatible updates. This can result in runtime errors or application failures.
 
 ### Floating version for minor version (1.*)
 
 * Good because it maximizes flexibility and allows for adoption of new features without the need for frequent updates.
 * Good because it can foster innovation by easily incorporating new functionalities from upstream dependencies.
+* Bad because multiple libraries may depend on different floating versions of the same package, leading to version conflicts. Legacy configurations that contain hard-coded bindings can further complicate this scenario, making dependency resolution challenging.
 * Bad because it increases the risk of breaking changes significantly, as major updates can introduce issues that the team might not be prepared to handle immediately.
+* Bad because legacy projects with specific assembly bindings in `web.config` may encounter conflicts if floating versions introduce incompatible updates. This can result in runtime errors or application failures.
 
 ### Strict version (1.3.9)
 
