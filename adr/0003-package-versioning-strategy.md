@@ -31,7 +31,9 @@ Chosen option: ...
 
 ### Negative Consequences
 
-* ...
+* **Lack of Updates:** Increases the likelihood of missing out on important bug fixes, performance improvements, and security patches that come with newer versions.
+* **Maintenance Overhead:** Requires more manual effort to review and update dependencies periodically, which can lead to technical debt if not managed properly.
+* **Slower Adoption of Features:** May delay the integration of new features and enhancements from upstream libraries, potentially hindering the development process.
 
 ## Pros and Cons of the Options
 
