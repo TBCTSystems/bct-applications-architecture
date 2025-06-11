@@ -23,7 +23,7 @@ As we integrate various packages into our projects, we must decide on a versioni
 
 ## Decision Outcome
 
-Chosen option: ...
+Chosen option: "Strict version (1.3.9)", because it provides maximum stability and predictability, ensuring that the application runs consistently across various environments.
 
 ### Positive Consequences
 
