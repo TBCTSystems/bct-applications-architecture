@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.terumo</groupId>
+    <artifactId>camel-donor-middleware</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Camel Donor Middleware</name>
+    <description>Apache Camel middleware for donor management with HTML generation</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <camel.version>4.2.0</camel.version>
+        <spring.boot.version>3.2.0</spring.boot.version>
+        <jackson.version>2.15.2</jackson.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring.boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.camel.springboot</groupId>
+                <artifactId>camel-spring-boot-bom</artifactId>
+                <version>${camel.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Spring Boot Starter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        
+        <!-- Apache Camel -->
+        <dependency>
+            <groupId>org.apache.camel.springboot</groupId>
+            <artifactId>camel-spring-boot-starter</artifactId>
+        </dependency>
+        
+        <!-- Camel HTTP -->
+        <dependency>
+            <groupId>org.apache.camel.springboot</groupId>
+            <artifactId>camel-http-starter</artifactId>
+        </dependency>
+        
+        <!-- Camel REST -->
+        <dependency>
+            <groupId>org.apache.camel.springboot</groupId>
+            <artifactId>camel-rest-starter</artifactId>
+        </dependency>
+        
+        <!-- Camel Jackson for JSON -->
+        <dependency>
+            <groupId>org.apache.camel.springboot</groupId>
+            <artifactId>camel-jackson-starter</artifactId>
+        </dependency>
+        
+        <!-- Camel JSONPath -->
+        <dependency>
+            <groupId>org.apache.camel.springboot</groupId>
+            <artifactId>camel-jsonpath-starter</artifactId>
+        </dependency>
+        
+        <!-- Camel Servlet -->
+        <dependency>
+            <groupId>org.apache.camel.springboot</groupId>
+            <artifactId>camel-servlet-starter</artifactId>
+        </dependency>
+        
+        <!-- Thymeleaf for HTML templating -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        
+        <!-- Jackson for JSON processing -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        
+        <!-- Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        
+        <!-- Actuator for health checks -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-test-spring-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring.boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,26 @@
+{
+  "name": "mock-ehr-server",
+  "version": "1.0.0",
+  "description": "Mock EHR server for donor management testing",
+  "main": "mock-ehr.js",
+  "scripts": {
+    "start": "node mock-ehr.js",
+    "dev": "nodemon mock-ehr.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "ehr",
+    "mock",
+    "donor",
+    "medical",
+    "api"
+  ],
+  "author": "Terumo",
+  "license": "MIT"
+}

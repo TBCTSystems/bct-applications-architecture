@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">Donor Management System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 1.8em;
+            font-weight: 400;
+        }
+        
+        .content {
+            padding: 15px;
+        }
+        
+        .donor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        
+        .donor-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: white;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            min-height: 80px;
+        }
+        
+        .donor-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+        }
+        
+        .donor-card.selected {
+            border-color: #4CAF50;
+            background-color: #f8fff8;
+        }
+        
+        .donor-photo {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            object-fit: cover;
+            border: 2px solid #eee;
+        }
+        
+        .donor-info {
+            flex: 1;
+        }
+        
+        .donor-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        .donor-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.75em;
+            display: inline-block;
+        }
+        
+        .status-not-available {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        .status-checked-in {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .status-donating {
+            background-color: #fff3e0;
+            color: #ef6c00;
+        }
+        
+        .status-donated {
+            background-color: #e1f5fe;
+            color: #0277bd;
+        }
+        
+        .donor-tags {
+            margin-top: 10px;
+        }
+        
+        .tag {
+            background-color: #f0f0f0;
+            color: #666;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-right: 5px;
+            display: inline-block;
+        }
+        
+        .no-donors {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .selection-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .donor-grid {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            
+            .header {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .content {
+                padding: 10px;
+            }
+            
+            .donor-card {
+                min-height: 70px;
+                padding: 12px;
+            }
+            
+            .donor-photo {
+                width: 40px;
+                height: 40px;
+                margin-right: 12px;
+            }
+            
+            .selection-info {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Donor Selection</h1>
+        </div>
+        
+        <div class="content">
+            <div th:if="${#lists.isEmpty(donors)}" class="no-donors">
+                <p>No donors available at this time.</p>
+            </div>
+            
+            <div th:unless="${#lists.isEmpty(donors)}" class="donor-grid">
+                <div th:each="donor : ${donors}"
+                     class="donor-card"
+                     th:data-donor-id="${donor.id}"
+                     th:data-donor-name="${donor.name}">
+                    
+                    <img th:src="'/donors/images/donor-' + ${donor.id} + '.jpeg'"
+                         th:alt="${donor.name}"
+                         class="donor-photo"
+                         onerror="this.style.display='none'">
+                    
+                    <div class="donor-info">
+                        <div class="donor-name" th:text="${donor.name}">John Doe</div>
+                        <div class="donor-status"
+                             th:classappend="'status-' + ${#strings.replace(donor.status.value, '-', '-')}"
+                             th:text="${donor.status.value}">
+                            checked-in
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="selectionInfo" class="selection-info">
+        <span id="selectionText">Donor selected successfully!</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const donorCards = document.querySelectorAll('.donor-card');
+            const selectionInfo = document.getElementById('selectionInfo');
+            const selectionText = document.getElementById('selectionText');
+            
+            donorCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    // Remove previous selections
+                    donorCards.forEach(c => c.classList.remove('selected'));
+                    
+                    // Mark current card as selected
+                    this.classList.add('selected');
+                    
+                    const donorId = this.getAttribute('data-donor-id');
+                    const donorName = this.getAttribute('data-donor-name');
+                    
+                    // Show selection feedback
+                    selectionText.textContent = `Selected: ${donorName} (ID: ${donorId})`;
+                    selectionInfo.style.display = 'block';
+                    
+                    // Navigate directly to donor details page
+                    selectionText.textContent = `Opening details for ${donorName}...`;
+                    
+                    // Navigate to donor details page after a short delay
+                    setTimeout(() => {
+                        window.location.href = `/donors/donor/${donorId}/details`;
+                    }, 800);
+                });
+            });
+            
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                window.location.reload();
+            }, 30000);
+        });
+    </script>
+</body>
+</html>

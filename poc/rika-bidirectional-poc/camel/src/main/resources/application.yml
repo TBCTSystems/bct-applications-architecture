@@ -1,0 +1,62 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: camel-donor-middleware
+  thymeleaf:
+    cache: false
+    mode: HTML
+    encoding: UTF-8
+    prefix: classpath:/templates/
+    suffix: .html
+
+camel:
+  springboot:
+    name: camel-donor-middleware
+  servlet:
+    mapping:
+      context-path: /donors/*
+  rest:
+    binding-mode: json
+    enable-cors: true
+    component: servlet
+    context-path: /donors
+    port: 8080
+
+# EHR Integration Configuration
+ehr:
+  base:
+    url: http://localhost:3001
+
+# Logging Configuration
+logging:
+  level:
+    com.terumo.camel: DEBUG
+    org.apache.camel: INFO
+    org.springframework: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management and Health Check
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,camelroutes
+  endpoint:
+    health:
+      show-details: always
+
+# Application Info
+info:
+  app:
+    name: Camel Donor Middleware
+    description: Apache Camel middleware for donor management with HTML generation
+    version: 1.0.0
+    encoding: UTF-8
+    java:
+      version: 17

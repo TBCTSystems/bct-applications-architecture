@@ -1,0 +1,155 @@
+# Java/Maven
+target/
+*.jar
+*.war
+*.ear
+*.class
+*.log
+*.tmp
+*.temp
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+*.tar.gz
+
+# Package managers
+package-lock.json
+yarn.lock
+
+# Docker
+.dockerignore
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+
+# Eclipse
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+.project
+.classpath
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.pid
+*.seed
+*.pid.lock
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Spring Boot
+application-*.yml
+!application.yml
+!application-docker.yml
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Application specific
+/uploads/
+/downloads/
+/temp/

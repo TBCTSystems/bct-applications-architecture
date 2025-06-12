@@ -1,0 +1,57 @@
+# Docker-specific configuration
+spring:
+  application:
+    name: camel-donor-middleware
+  thymeleaf:
+    cache: true
+    mode: HTML
+    encoding: UTF-8
+
+camel:
+  springboot:
+    name: camel-donor-middleware
+  servlet:
+    mapping:
+      context-path: /donors/*
+  rest:
+    binding-mode: json
+    enable-cors: true
+    component: servlet
+    context-path: /donors
+    port: 8080
+
+# EHR Integration Configuration (Docker)
+ehr:
+  base:
+    url: ${EHR_BASE_URL:http://mock-ehr:3001}
+
+# Logging Configuration for Docker
+logging:
+  level:
+    com.terumo.camel: INFO
+    org.apache.camel: WARN
+    org.springframework: WARN
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management and Health Check
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+  server:
+    port: 8080
+
+# Server configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 10
