@@ -54,25 +54,83 @@ docker-compose logs -f
 
 ## Architecture
 
-```
-[Rika Device] <---> [Apache Camel Middleware] <---> [Mock EHR System]
-                              |
-                         [HTML Generation]
-                         [Thymeleaf Templates]
+### C4 Context Diagram
+
+```mermaid
+C4Context
+    title System Context Diagram - Apache Camel Donor Middleware
+
+    Person(medicalStaff, "Medical Staff", "Healthcare professionals using embedded devices for donor management")
+    
+    System_Boundary(deviceBoundary, "Medical Device Ecosystem") {
+        System(rikaDevice, "Rika Device", "Embedded medical device with web browser for donor selection workflows")
+    }
+    
+    System_Boundary(middlewareBoundary, "Middleware Layer") {
+        System(camelMiddleware, "Apache Camel Middleware", "Integration middleware providing HTML interfaces and EHR connectivity")
+    }
+    
+    System_Boundary(ehrBoundary, "Healthcare Systems") {
+        System(ehrSystem, "EHR System", "Electronic Health Records system managing donor data and medical workflows")
+    }
+
+    Rel(medicalStaff, rikaDevice, "Operates device for donor selection", "Touch interface")
+    Rel(rikaDevice, camelMiddleware, "Requests donor lists and submits selections", "HTTP/HTML")
+    Rel(camelMiddleware, ehrSystem, "Synchronizes donor data and updates", "REST API")
+    
+    UpdateRelStyle(medicalStaff, rikaDevice, $textColor="blue", $lineColor="blue")
+    UpdateRelStyle(rikaDevice, camelMiddleware, $textColor="green", $lineColor="green")
+    UpdateRelStyle(camelMiddleware, ehrSystem, $textColor="orange", $lineColor="orange")
 ```
 
-### Components
+### Container Diagram
+
+```mermaid
+C4Container
+    title Container Diagram - Apache Camel Donor Middleware
+
+    Person(medicalStaff, "Medical Staff", "Healthcare professionals")
+    
+    System_Boundary(deviceBoundary, "Rika Device") {
+        Container(webBrowser, "Web Browser", "Embedded Browser", "Displays HTML interfaces for donor workflows")
+    }
+    
+    System_Boundary(middlewareBoundary, "Apache Camel Middleware") {
+        Container(camelApp, "Camel Application", "Spring Boot + Apache Camel", "REST endpoints, HTML generation, EHR integration")
+        Container(thymeleaf, "Thymeleaf Engine", "Template Engine", "Server-side HTML rendering for device interfaces")
+        Container(staticFiles, "Static Resources", "File System", "Donor photos and CSS/JS assets")
+    }
+    
+    System_Boundary(ehrBoundary, "Mock EHR System") {
+        Container(ehrApi, "EHR API Server", "Node.js + Express", "Donor CRUD operations and selection tracking")
+        Container(ehrDb, "Donor Database", "In-Memory Store", "Donor records and status information")
+    }
+
+    Rel(medicalStaff, webBrowser, "Interacts with", "Touch/Click")
+    Rel(webBrowser, camelApp, "HTTP requests", "REST API calls")
+    Rel(camelApp, thymeleaf, "Renders templates", "Template processing")
+    Rel(camelApp, staticFiles, "Serves images", "File access")
+    Rel(camelApp, ehrApi, "Synchronizes data", "HTTP/JSON")
+    Rel(ehrApi, ehrDb, "Stores/retrieves", "Data access")
+    
+    UpdateRelStyle(webBrowser, camelApp, $textColor="green", $lineColor="green")
+    UpdateRelStyle(camelApp, ehrApi, $textColor="orange", $lineColor="orange")
+```
+
+### Key Components
 
 1. **Apache Camel Middleware** (Port 8080)
-   - REST API endpoints
-   - HTML generation using Thymeleaf
+   - REST API endpoints for donor workflows
+   - HTML generation using Thymeleaf templates
    - EHR integration via HTTP routes
-   - Static image serving
+   - Static image serving for donor photos
+   - Cookie-based session management
 
 2. **Mock EHR Server** (Port 3001)
-   - Simulates real EHR system
+   - Simulates real EHR system behavior
    - Donor CRUD operations
-   - Selection tracking
+   - Selection tracking and status updates
+   - RESTful API for middleware integration
 
 ## Workflow
 
