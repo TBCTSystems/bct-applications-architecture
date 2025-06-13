@@ -115,6 +115,7 @@ public class Donor {
         this.status = status;
     }
 
+    @JsonProperty("FIRS")
     public String getFirs() {
         return firs;
     }
@@ -123,6 +124,7 @@ public class Donor {
         this.firs = firs;
     }
 
+    @JsonProperty("LAST")
     public String getLast() {
         return last;
     }
@@ -131,6 +133,7 @@ public class Donor {
         this.last = last;
     }
 
+    @JsonProperty("DOB")
     public String getDob() {
         return dob;
     }
@@ -139,6 +142,7 @@ public class Donor {
         this.dob = dob;
     }
 
+    @JsonProperty("HCT")
     public String getHct() {
         return hct;
     }
@@ -147,6 +151,7 @@ public class Donor {
         this.hct = hct;
     }
 
+    @JsonProperty("WGHT")
     public String getWght() {
         return wght;
     }
@@ -155,6 +160,7 @@ public class Donor {
         this.wght = wght;
     }
 
+    @JsonProperty("HGHT")
     public String getHght() {
         return hght;
     }
@@ -163,6 +169,7 @@ public class Donor {
         this.hght = hght;
     }
 
+    @JsonProperty("BG")
     public String getBg() {
         return bg;
     }
