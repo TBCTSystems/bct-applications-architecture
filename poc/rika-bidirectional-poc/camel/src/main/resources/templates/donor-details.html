@@ -379,13 +379,13 @@
             const path = "path=/";
 
             document.cookie = `selectedDonorId=${donorId}; ${path}; ${maxAge}`;
-            document.cookie = `FIRS=${donorData.firs || ''}; ${path}; ${maxAge}`;
-            document.cookie = `LAST=${donorData.last || ''}; ${path}; ${maxAge}`;
-            document.cookie = `DOB=${donorData.dob || ''}; ${path}; ${maxAge}`;
-            document.cookie = `HCT=${donorData.hct || ''}; ${path}; ${maxAge}`;
-            document.cookie = `WGHT=${donorData.wght || ''}; ${path}; ${maxAge}`;
-            document.cookie = `HGHT=${donorData.hght || ''}; ${path}; ${maxAge}`;
-            document.cookie = `BG=${donorData.bg || ''}; ${path}; ${maxAge}`;
+            document.cookie = `FIRS=${donorData.FIRS || ''}; ${path}; ${maxAge}`;
+            document.cookie = `LAST=${donorData.LAST || ''}; ${path}; ${maxAge}`;
+            document.cookie = `DOB=${donorData.DOB || ''}; ${path}; ${maxAge}`;
+            document.cookie = `HCT=${donorData.HCT || ''}; ${path}; ${maxAge}`;
+            document.cookie = `WGHT=${donorData.WGHT || ''}; ${path}; ${maxAge}`;
+            document.cookie = `HGHT=${donorData.HGHT || ''}; ${path}; ${maxAge}`;
+            document.cookie = `BG=${donorData.BG || ''}; ${path}; ${maxAge}`;
             
             // Send confirmation to middleware (fire and forget)
             fetch('/donors/select/donor', {
