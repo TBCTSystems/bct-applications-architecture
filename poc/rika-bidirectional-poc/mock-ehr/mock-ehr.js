@@ -16,7 +16,14 @@ let donors = [
     "name": "John Wayne",
     "photoUrls": ["https://example.com/photos/john_wayne.jpg"],
     "tags": [{ "id": 1, "name": "VIP" }, { "id": 3, "name": "Regular" }],
-    "status": "donated"
+    "status": "donated",
+    "FIRS": "John",
+    "LAST": "Wayne",
+    "DOB": "19970423",
+    "HCT": "40",
+    "WGHT": "140.7",
+    "HGHT": "69.7",
+    "BG": "M"
   },
   {
     "id": 2,
@@ -24,7 +31,14 @@ let donors = [
     "name": "Audrey Hepburn",
     "photoUrls": ["https://example.com/photos/audrey_hepburn.jpg"],
     "tags": [{ "id": 2, "name": "Recurring" }],
-    "status": "checked-in"
+    "status": "checked-in",
+    "FIRS": "Audrey",
+    "LAST": "Hepburn",
+    "DOB": "19970423",
+    "HCT": "40",
+    "WGHT": "140.7",
+    "HGHT": "69.7",
+    "BG": "F"
   },
   {
     "id": 3,
@@ -32,7 +46,14 @@ let donors = [
     "name": "MegaCorp Inc.",
     "photoUrls": [],
     "tags": [{ "id": 4, "name": "Corporate" }],
-    "status": "not-available"
+    "status": "not-available",
+    "FIRS": "MegaCorp",
+    "LAST": "Inc.",
+    "DOB": "19970423",
+    "HCT": "40",
+    "WGHT": "140.7",
+    "HGHT": "69.7",
+    "BG": "U"
   },
   {
     "id": 4,
@@ -40,7 +61,14 @@ let donors = [
     "name": "Grace Kelly",
     "photoUrls": [],
     "tags": [{ "id": 1, "name": "VIP" }, { "id": 5, "name": "First-time" }],
-    "status": "donating"
+    "status": "donating",
+    "FIRS": "Grace",
+    "LAST": "Kelly",
+    "DOB": "19970423",
+    "HCT": "40",
+    "WGHT": "140.7",
+    "HGHT": "69.7",
+    "BG": "F"
   },
   {
     "id": 5,
@@ -48,7 +76,14 @@ let donors = [
     "name": "Clark Gable",
     "photoUrls": ["https://example.com/photos/clark_gable.jpg"],
     "tags": [{ "id": 2, "name": "Recurring" }],
-    "status": "checked-in"
+    "status": "checked-in",
+    "FIRS": "Clark",
+    "LAST": "Gable",
+    "DOB": "19970423",
+    "HCT": "40",
+    "WGHT": "140.7",
+    "HGHT": "69.7",
+    "BG": "M"
   }
 ];
 

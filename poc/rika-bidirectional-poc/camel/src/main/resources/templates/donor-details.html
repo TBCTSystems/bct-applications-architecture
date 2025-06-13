@@ -25,14 +25,24 @@
         .header {
             background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
             color: white;
-            padding: 30px;
+            padding: 20px 30px; /* Adjusted padding */
             text-align: center;
+            position: relative; /* For positioning operator ID */
+        }
+
+        .operator-info {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-size: 0.9em;
+            opacity: 0.9;
         }
         
         .header h1 {
             margin: 0;
             font-size: 2.2em;
             font-weight: 300;
+            margin-top: 15px; /* Add margin if operator info is present */
         }
         
         .header p {
@@ -241,6 +251,7 @@
 <body>
     <div class="container">
         <div class="header">
+            <div class="operator-info" th:if="${operatorId}" th:text="'Operator: ' + ${operatorId}">Operator: unknown</div>
             <h1>Donor Confirmation</h1>
             <p>Please review the donor details before proceeding</p>
         </div>
@@ -295,6 +306,41 @@
                             <div class="detail-label">Photos</div>
                             <div class="detail-value" th:text="${#lists.size(donor.photoUrls)} + ' photo(s) available'">1 photo(s) available</div>
                         </div>
+
+                        <div class="detail-item">
+                            <div class="detail-label">First Name</div>
+                            <div class="detail-value" th:text="${donor.firs}">John</div>
+                        </div>
+
+                        <div class="detail-item">
+                            <div class="detail-label">Last Name</div>
+                            <div class="detail-value" th:text="${donor.last}">Doe</div>
+                        </div>
+
+                        <div class="detail-item">
+                            <div class="detail-label">Date of Birth</div>
+                            <div class="detail-value" th:text="${donor.dob}">19900101</div>
+                        </div>
+
+                        <div class="detail-item">
+                            <div class="detail-label">Hematocrit (%)</div>
+                            <div class="detail-value" th:text="${donor.hct}">40</div>
+                        </div>
+
+                        <div class="detail-item">
+                            <div class="detail-label">Weight (lbs)</div>
+                            <div class="detail-value" th:text="${donor.wght}">150</div>
+                        </div>
+
+                        <div class="detail-item">
+                            <div class="detail-label">Height (inches)</div>
+                            <div class="detail-value" th:text="${donor.hght}">70</div>
+                        </div>
+
+                        <div class="detail-item">
+                            <div class="detail-label">Birth Gender</div>
+                            <div class="detail-value" th:text="${donor.bg}">M</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -313,14 +359,33 @@
         </div>
     </div>
 
-    <script>
+    <script th:inline="javascript">
+    /*<![CDATA[*/
+        const donorData = /*[[${donors[0]}]]*/ null;
+    /*]]>*/
+
         function confirmDonor() {
-            const donorId = window.location.pathname.split('/')[3]; // Extract donor ID from URL
-            const donorName = document.querySelector('.donor-name').textContent;
+            if (!donorData) {
+                console.error("Donor data is not available.");
+                alert("Error: Donor data not found. Cannot confirm selection.");
+                return;
+            }
+
+            const donorId = donorData.id;
+            const donorName = donorData.name;
             
-            // Set donor ID cookie
-            const cookieValue = `donorId=${donorId}`;
-            document.cookie = `selectedDonorId=${donorId}; path=/; max-age=86400`; // 24 hours
+            // Set cookies
+            const maxAge = "max-age=86400"; // 24 hours
+            const path = "path=/";
+
+            document.cookie = `selectedDonorId=${donorId}; ${path}; ${maxAge}`;
+            document.cookie = `FIRS=${donorData.firs || ''}; ${path}; ${maxAge}`;
+            document.cookie = `LAST=${donorData.last || ''}; ${path}; ${maxAge}`;
+            document.cookie = `DOB=${donorData.dob || ''}; ${path}; ${maxAge}`;
+            document.cookie = `HCT=${donorData.hct || ''}; ${path}; ${maxAge}`;
+            document.cookie = `WGHT=${donorData.wght || ''}; ${path}; ${maxAge}`;
+            document.cookie = `HGHT=${donorData.hght || ''}; ${path}; ${maxAge}`;
+            document.cookie = `BG=${donorData.bg || ''}; ${path}; ${maxAge}`;
             
             // Send confirmation to middleware (fire and forget)
             fetch('/donors/select/donor', {
@@ -338,7 +403,10 @@
             });
             
             // Show confirmation alert
-            alert(`Donation ID cookie set (${cookieValue}). EHR UPDATED. This should now close the WebViewEngine.`);
+            let cookiesSetMessage = `Cookies set: selectedDonorId=${donorId}`;
+            if (donorData.firs) cookiesSetMessage += `, FIRS=${donorData.firs}`;
+            // Add other fields to message if needed for verbosity in alert
+            alert(`${cookiesSetMessage}. EHR UPDATED. This should now close the WebViewEngine.`);
             
             // Navigate back to list
             window.location.href = '/donors/donor/list';

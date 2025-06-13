@@ -33,6 +33,21 @@ public class HtmlGenerationProcessor implements Processor {
         context.setVariable("donors", donors);
         context.setVariable("title", "Donor Management System");
         context.setVariable("timestamp", java.time.LocalDateTime.now().toString());
+
+        // Read operatorID cookie
+        String operatorId = "unknown";
+        String cookieHeader = exchange.getIn().getHeader("Cookie", String.class);
+        if (cookieHeader != null) {
+            String[] cookies = cookieHeader.split(";");
+            for (String cookie : cookies) {
+                String[] parts = cookie.trim().split("=");
+                if (parts.length == 2 && "operatorID".equals(parts[0])) {
+                    operatorId = parts[1];
+                    break;
+                }
+            }
+        }
+        context.setVariable("operatorId", operatorId);
         
         // Process the template
         String html = templateEngine.process("donors", context);

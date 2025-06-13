@@ -33,6 +33,21 @@ public class DonorDetailsProcessor implements Processor {
         context.setVariable("donors", donors);
         context.setVariable("title", "Donor Details - Confirmation");
         context.setVariable("timestamp", java.time.LocalDateTime.now().toString());
+
+        // Read operatorID cookie
+        String operatorId = "unknown";
+        String cookieHeader = exchange.getIn().getHeader("Cookie", String.class);
+        if (cookieHeader != null) {
+            String[] cookies = cookieHeader.split(";");
+            for (String cookie : cookies) {
+                String[] parts = cookie.trim().split("=");
+                if (parts.length == 2 && "operatorID".equals(parts[0])) {
+                    operatorId = parts[1];
+                    break;
+                }
+            }
+        }
+        context.setVariable("operatorId", operatorId);
         
         // Process the donor details template
         String html = templateEngine.process("donor-details", context);

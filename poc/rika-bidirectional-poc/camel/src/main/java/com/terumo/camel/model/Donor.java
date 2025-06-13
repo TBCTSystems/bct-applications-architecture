@@ -26,16 +26,45 @@ public class Donor {
     @JsonProperty("status")
     @NotNull
     private DonorStatus status;
+
+    @JsonProperty("FIRS")
+    private String firs;
+
+    @JsonProperty("LAST")
+    private String last;
+
+    @JsonProperty("DOB")
+    private String dob;
+
+    @JsonProperty("HCT")
+    private String hct;
+
+    @JsonProperty("WGHT")
+    private String wght;
+
+    @JsonProperty("HGHT")
+    private String hght;
+
+    @JsonProperty("BG")
+    private String bg;
     
     public Donor() {}
     
-    public Donor(Long id, Category category, String name, List<String> photoUrls, List<Tag> tags, DonorStatus status) {
+    public Donor(Long id, Category category, String name, List<String> photoUrls, List<Tag> tags, DonorStatus status,
+                 String firs, String last, String dob, String hct, String wght, String hght, String bg) {
         this.id = id;
         this.category = category;
         this.name = name;
         this.photoUrls = photoUrls;
         this.tags = tags;
         this.status = status;
+        this.firs = firs;
+        this.last = last;
+        this.dob = dob;
+        this.hct = hct;
+        this.wght = wght;
+        this.hght = hght;
+        this.bg = bg;
     }
     
     public Long getId() {
@@ -85,6 +114,62 @@ public class Donor {
     public void setStatus(DonorStatus status) {
         this.status = status;
     }
+
+    public String getFirs() {
+        return firs;
+    }
+
+    public void setFirs(String firs) {
+        this.firs = firs;
+    }
+
+    public String getLast() {
+        return last;
+    }
+
+    public void setLast(String last) {
+        this.last = last;
+    }
+
+    public String getDob() {
+        return dob;
+    }
+
+    public void setDob(String dob) {
+        this.dob = dob;
+    }
+
+    public String getHct() {
+        return hct;
+    }
+
+    public void setHct(String hct) {
+        this.hct = hct;
+    }
+
+    public String getWght() {
+        return wght;
+    }
+
+    public void setWght(String wght) {
+        this.wght = wght;
+    }
+
+    public String getHght() {
+        return hght;
+    }
+
+    public void setHght(String hght) {
+        this.hght = hght;
+    }
+
+    public String getBg() {
+        return bg;
+    }
+
+    public void setBg(String bg) {
+        this.bg = bg;
+    }
     
     @Override
     public String toString() {
@@ -95,6 +180,13 @@ public class Donor {
                 ", photoUrls=" + photoUrls +
                 ", tags=" + tags +
                 ", status=" + status +
+                ", firs='" + firs + '\'' +
+                ", last='" + last + '\'' +
+                ", dob='" + dob + '\'' +
+                ", hct='" + hct + '\'' +
+                ", wght='" + wght + '\'' +
+                ", hght='" + hght + '\'' +
+                ", bg='" + bg + '\'' +
                 '}';
     }
 }

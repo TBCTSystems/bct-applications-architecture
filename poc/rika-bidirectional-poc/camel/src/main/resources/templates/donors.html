@@ -25,14 +25,24 @@
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px;
+            padding: 15px 20px; /* Adjusted padding */
             text-align: center;
+            position: relative; /* For positioning operator ID */
+        }
+
+        .operator-info {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-size: 0.85em;
+            opacity: 0.9;
         }
         
         .header h1 {
             margin: 0;
             font-size: 1.8em;
             font-weight: 400;
+            margin-top: 15px; /* Add margin if operator info is present */
         }
         
         .content {
@@ -198,6 +208,7 @@
 <body>
     <div class="container">
         <div class="header">
+            <div class="operator-info" th:if="${operatorId}" th:text="'Operator: ' + ${operatorId}">Operator: unknown</div>
             <h1>Donor Selection</h1>
         </div>
         
