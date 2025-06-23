@@ -89,6 +89,10 @@ let donors = [
 
 let nextId = 6;
 
+// In-memory storage for End of Run (EOR) data
+let eorData = [];
+let nextEorId = 1;
+
 // Helper function to find donor by ID
 const findDonorById = (id) => donors.find(d => d.id === parseInt(id));
 
@@ -234,6 +238,99 @@ app.post('/donors/select', (req, res) => {
   });
 });
 
+// POST /eor - Receive End of Run data
+app.post('/eor', (req, res) => {
+  console.log(`[Mock EHR] Received EOR data:`, req.body);
+  
+  // Accept any valid JSON object as EOR data
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ 
+      error: 'Invalid EOR data', 
+      message: 'EOR data must be a valid JSON object' 
+    });
+  }
+  
+  const eorEntry = {
+    id: nextEorId++,
+    data: req.body,
+    receivedAt: new Date().toISOString(),
+    source: req.headers['user-agent'] || 'unknown'
+  };
+  
+  eorData.push(eorEntry);
+  console.log(`[Mock EHR] EOR data stored with ID: ${eorEntry.id}`);
+  
+  res.status(201).json({
+    status: 'success',
+    message: 'EOR data received and stored successfully',
+    eorId: eorEntry.id,
+    receivedAt: eorEntry.receivedAt
+  });
+});
+
+// GET /eor - Get all EOR data
+app.get('/eor', (req, res) => {
+  console.log(`[Mock EHR] Request received for all EOR data. Count: ${eorData.length}`);
+  
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = parseInt(req.query.offset) || 0;
+  
+  const paginatedData = eorData.slice(offset, offset + limit);
+  
+  res.json({
+    total: eorData.length,
+    limit: limit,
+    offset: offset,
+    data: paginatedData
+  });
+});
+
+// GET /eor/:id - Get specific EOR data by ID
+app.get('/eor/:id', (req, res) => {
+  const eorId = parseInt(req.params.id, 10);
+  console.log(`[Mock EHR] Request received for EOR ID: ${eorId}`);
+  
+  const eorEntry = eorData.find(e => e.id === eorId);
+  
+  if (eorEntry) {
+    res.json(eorEntry);
+  } else {
+    res.status(404).json({ error: 'EOR data not found', code: 404 });
+  }
+});
+
+// DELETE /eor - Clear all EOR data (useful for testing)
+app.delete('/eor', (req, res) => {
+  console.log(`[Mock EHR] Request to clear all EOR data`);
+  const deletedCount = eorData.length;
+  eorData = [];
+  nextEorId = 1;
+  
+  console.log(`[Mock EHR] Cleared ${deletedCount} EOR entries`);
+  res.json({
+    status: 'success',
+    message: `Cleared ${deletedCount} EOR entries`,
+    deletedCount: deletedCount
+  });
+});
+
+// DELETE /eor/:id - Delete specific EOR data by ID
+app.delete('/eor/:id', (req, res) => {
+  const eorId = parseInt(req.params.id, 10);
+  console.log(`[Mock EHR] Request to delete EOR ID: ${eorId}`);
+  
+  const eorIndex = eorData.findIndex(e => e.id === eorId);
+  
+  if (eorIndex === -1) {
+    return res.status(404).json({ error: 'EOR data not found', code: 404 });
+  }
+  
+  const deletedEor = eorData.splice(eorIndex, 1)[0];
+  console.log(`[Mock EHR] EOR data deleted:`, deletedEor.id);
+  
+  res.status(204).send();
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -262,6 +359,12 @@ app.listen(PORT, () => {
   console.log(`  POST   /donors - Add new donor`);
   console.log(`  PUT    /donors/:id - Update donor`);
   console.log(`  DELETE /donors/:id - Delete donor`);
+  console.log(`  POST   /donors/select - Select donor for processing`);
+  console.log(`  POST   /eor - Receive End of Run data`);
+  console.log(`  GET    /eor - Get all EOR data`);
+  console.log(`  GET    /eor/:id - Get specific EOR data`);
+  console.log(`  DELETE /eor - Clear all EOR data`);
+  console.log(`  DELETE /eor/:id - Delete specific EOR data`);
   console.log(`  GET    /health - Health check`);
   console.log(`[Mock EHR] Initial donors loaded: ${donors.length}`);
 });

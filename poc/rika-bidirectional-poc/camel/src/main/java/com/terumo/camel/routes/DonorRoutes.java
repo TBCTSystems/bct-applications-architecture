@@ -97,6 +97,15 @@ public class DonorRoutes extends RouteBuilder {
                 .produces("image/jpeg")
                 .to("direct:serveImage");
 
+        // End of Run (EoR) endpoint
+        rest("/eor")
+            .description("End of Run data operations")
+            .post()
+                .description("Submit End of Run data")
+                .consumes("application/json")
+                .produces("application/json")
+                .to("direct:submitEorData");
+
         // Route implementations
         
         // Get donors as HTML page
@@ -241,5 +250,16 @@ public class DonorRoutes extends RouteBuilder {
                     .log("Received fresh data from EHR")
             .end()
             .convertBodyTo(String.class);
+
+        // Submit End of Run (EoR) data to EHR
+        from("direct:submitEorData")
+            .routeId("submitEorData")
+            .log("Submitting EoR data to EHR: ${body}")
+            .marshal().json()
+            .setHeader("CamelHttpMethod", constant("POST"))
+            .setHeader("Content-Type", constant("application/json"))
+            .to(ehrBaseUrl + "/eor?bridgeEndpoint=true")
+            .convertBodyTo(String.class)
+            .log("EoR data submitted successfully: ${body}");
     }
 }
