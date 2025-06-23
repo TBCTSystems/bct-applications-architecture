@@ -161,6 +161,7 @@ The `run.sh` script provides these operations:
 - `status` - Show service status and port usage
 - `clean` - Stop services and clean up Docker resources
 - `open` - Open the donor list in browser
+- `reset-donors` - Reset all donors to 'checked-in' status
 - `help` - Show help message
 
 ## Development
