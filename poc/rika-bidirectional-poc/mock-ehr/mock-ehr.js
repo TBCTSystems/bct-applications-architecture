@@ -6,7 +6,11 @@ const PORT = 3001;
 
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // For form data
 app.use(cors());
+
+// Serve static files (for CSS, JS, etc.)
+app.use('/static', express.static('public'));
 
 // This is our in-memory database with enhanced data
 let donors = [
@@ -160,7 +164,14 @@ app.post('/donors', (req, res) => {
     name: req.body.name,
     photoUrls: req.body.photoUrls || [],
     tags: req.body.tags || [],
-    status: req.body.status
+    status: req.body.status,
+    FIRS: req.body.FIRS || req.body.name.split(' ')[0] || '',
+    LAST: req.body.LAST || req.body.name.split(' ').slice(1).join(' ') || '',
+    DOB: req.body.DOB || '',
+    HCT: req.body.HCT || '',
+    WGHT: req.body.WGHT || '',
+    HGHT: req.body.HGHT || '',
+    BG: req.body.BG || ''
   };
   
   donors.push(newDonor);
@@ -331,6 +342,473 @@ app.delete('/eor/:id', (req, res) => {
   res.status(204).send();
 });
 
+// Web Interface Routes
+
+// Main dashboard
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Mock EHR Dashboard</title>
+        <link rel="stylesheet" href="/static/style.css">
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>🏥 Mock EHR Dashboard</h1>
+                <p>Donor Management & EOR Data Interface</p>
+            </header>
+            
+            <nav class="nav-cards">
+                <a href="/donors-interface" class="nav-card">
+                    <h3>👥 Manage Donors</h3>
+                    <p>Add new donors and view existing ones</p>
+                </a>
+                <a href="/eor-interface" class="nav-card">
+                    <h3>📊 EOR Data</h3>
+                    <p>Browse End of Run data</p>
+                </a>
+                <a href="/api-docs" class="nav-card">
+                    <h3>📋 API Documentation</h3>
+                    <p>View available REST endpoints</p>
+                </a>
+            </nav>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <h4>Total Donors</h4>
+                    <span class="stat-number">${donors.length}</span>
+                </div>
+                <div class="stat-card">
+                    <h4>EOR Records</h4>
+                    <span class="stat-number">${eorData.length}</span>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `);
+});
+
+// Donors management interface
+app.get('/donors-interface', (req, res) => {
+  const donorsHtml = donors.map(donor => `
+    <tr>
+      <td>${donor.id}</td>
+      <td>${donor.name}</td>
+      <td><span class="status-badge status-${donor.status}">${donor.status}</span></td>
+      <td>${donor.category.name}</td>
+      <td>
+        <button onclick="deleteDonor(${donor.id})" class="btn btn-danger btn-sm">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Donor Management - Mock EHR</title>
+        <link rel="stylesheet" href="/static/style.css">
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>👥 Donor Management</h1>
+                <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+            </header>
+            
+            <div class="content-grid">
+                <div class="form-section">
+                    <h2>Add New Donor</h2>
+                    <form id="donorForm" onsubmit="addDonor(event)">
+                        <div class="form-group">
+                            <label for="name">Full Name *</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="firstName">First Name</label>
+                            <input type="text" id="firstName" name="firstName">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="lastName">Last Name</label>
+                            <input type="text" id="lastName" name="lastName">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="dob">Date of Birth</label>
+                            <input type="date" id="dob" name="dob">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="bloodGroup">Blood Group</label>
+                            <select id="bloodGroup" name="bloodGroup">
+                                <option value="">Select...</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="status">Status *</label>
+                            <select id="status" name="status" required>
+                                <option value="not-available">Not Available</option>
+                                <option value="checked-in">Checked In</option>
+                                <option value="donating">Donating</option>
+                                <option value="donated">Donated</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="category">Category</label>
+                            <select id="category" name="category">
+                                <option value="Individual">Individual</option>
+                                <option value="Corporate">Corporate</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Add Donor</button>
+                    </form>
+                </div>
+                
+                <div class="table-section">
+                    <h2>Current Donors (${donors.length})</h2>
+                    <div class="table-container">
+                        <table class="donors-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Status</th>
+                                    <th>Category</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${donorsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            async function addDonor(event) {
+                event.preventDefault();
+                const formData = new FormData(event.target);
+                
+                const donorData = {
+                    name: formData.get('name'),
+                    status: formData.get('status'),
+                    category: {
+                        id: formData.get('category') === 'Corporate' ? 20 : 10,
+                        name: formData.get('category')
+                    },
+                    FIRS: formData.get('firstName') || formData.get('name').split(' ')[0],
+                    LAST: formData.get('lastName') || formData.get('name').split(' ').slice(1).join(' '),
+                    DOB: formData.get('dob') ? formData.get('dob').replace(/-/g, '') : '',
+                    BG: formData.get('bloodGroup') || '',
+                    photoUrls: [],
+                    tags: []
+                };
+                
+                try {
+                    const response = await fetch('/donors', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(donorData)
+                    });
+                    
+                    if (response.ok) {
+                        alert('Donor added successfully!');
+                        window.location.reload();
+                    } else {
+                        const error = await response.json();
+                        alert('Error adding donor: ' + (error.details ? error.details.join(', ') : error.error));
+                    }
+                } catch (error) {
+                    alert('Error adding donor: ' + error.message);
+                }
+            }
+            
+            async function deleteDonor(id) {
+                if (confirm('Are you sure you want to delete this donor?')) {
+                    try {
+                        const response = await fetch('/donors/' + id, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            alert('Donor deleted successfully!');
+                            window.location.reload();
+                        } else {
+                            alert('Error deleting donor');
+                        }
+                    } catch (error) {
+                        alert('Error deleting donor: ' + error.message);
+                    }
+                }
+            }
+        </script>
+    </body>
+    </html>
+  `);
+});
+
+// EOR data interface
+app.get('/eor-interface', (req, res) => {
+  const eorHtml = eorData.map(eor => `
+    <tr>
+      <td>${eor.id}</td>
+      <td>${new Date(eor.receivedAt).toLocaleString()}</td>
+      <td>${eor.source}</td>
+      <td>
+        <button onclick="viewEorData(${eor.id})" class="btn btn-info btn-sm">View</button>
+        <button onclick="deleteEor(${eor.id})" class="btn btn-danger btn-sm">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>EOR Data Browser - Mock EHR</title>
+        <link rel="stylesheet" href="/static/style.css">
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>📊 EOR Data Browser</h1>
+                <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+            </header>
+            
+            <div class="eor-controls">
+                <button onclick="clearAllEor()" class="btn btn-warning">Clear All EOR Data</button>
+                <button onclick="refreshEor()" class="btn btn-info">Refresh</button>
+            </div>
+            
+            <div class="table-section">
+                <h2>EOR Records (${eorData.length})</h2>
+                <div class="table-container">
+                    <table class="eor-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Received At</th>
+                                <th>Source</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${eorHtml}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal for viewing EOR data -->
+        <div id="eorModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2>EOR Data Details</h2>
+                <pre id="eorDataContent"></pre>
+            </div>
+        </div>
+        
+        <script>
+            async function viewEorData(id) {
+                try {
+                    const response = await fetch('/eor/' + id);
+                    if (response.ok) {
+                        const eorData = await response.json();
+                        document.getElementById('eorDataContent').textContent = JSON.stringify(eorData, null, 2);
+                        document.getElementById('eorModal').style.display = 'block';
+                    } else {
+                        alert('Error fetching EOR data');
+                    }
+                } catch (error) {
+                    alert('Error fetching EOR data: ' + error.message);
+                }
+            }
+            
+            function closeModal() {
+                document.getElementById('eorModal').style.display = 'none';
+            }
+            
+            async function deleteEor(id) {
+                if (confirm('Are you sure you want to delete this EOR record?')) {
+                    try {
+                        const response = await fetch('/eor/' + id, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            alert('EOR record deleted successfully!');
+                            window.location.reload();
+                        } else {
+                            alert('Error deleting EOR record');
+                        }
+                    } catch (error) {
+                        alert('Error deleting EOR record: ' + error.message);
+                    }
+                }
+            }
+            
+            async function clearAllEor() {
+                if (confirm('Are you sure you want to clear ALL EOR data? This cannot be undone.')) {
+                    try {
+                        const response = await fetch('/eor', {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            alert('All EOR data cleared successfully!');
+                            window.location.reload();
+                        } else {
+                            alert('Error clearing EOR data');
+                        }
+                    } catch (error) {
+                        alert('Error clearing EOR data: ' + error.message);
+                    }
+                }
+            }
+            
+            function refreshEor() {
+                window.location.reload();
+            }
+            
+            // Close modal when clicking outside of it
+            window.onclick = function(event) {
+                const modal = document.getElementById('eorModal');
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+        </script>
+    </body>
+    </html>
+  `);
+});
+
+// API documentation page
+app.get('/api-docs', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>API Documentation - Mock EHR</title>
+        <link rel="stylesheet" href="/static/style.css">
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>📋 API Documentation</h1>
+                <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+            </header>
+            
+            <div class="api-docs">
+                <h2>Available Endpoints</h2>
+                
+                <div class="endpoint-group">
+                    <h3>Donor Management</h3>
+                    <div class="endpoint">
+                        <span class="method get">GET</span>
+                        <code>/donors</code>
+                        <p>Get all donors</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method get">GET</span>
+                        <code>/donors/:id</code>
+                        <p>Get donor by ID (add ?verbose=true for enhanced data)</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method post">POST</span>
+                        <code>/donors</code>
+                        <p>Add new donor</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method put">PUT</span>
+                        <code>/donors/:id</code>
+                        <p>Update existing donor</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method delete">DELETE</span>
+                        <code>/donors/:id</code>
+                        <p>Delete donor</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method post">POST</span>
+                        <code>/donors/select</code>
+                        <p>Select donor for processing</p>
+                    </div>
+                </div>
+                
+                <div class="endpoint-group">
+                    <h3>EOR Data Management</h3>
+                    <div class="endpoint">
+                        <span class="method get">GET</span>
+                        <code>/eor</code>
+                        <p>Get all EOR data (supports limit and offset parameters)</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method get">GET</span>
+                        <code>/eor/:id</code>
+                        <p>Get specific EOR data by ID</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method post">POST</span>
+                        <code>/eor</code>
+                        <p>Submit new EOR data</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method delete">DELETE</span>
+                        <code>/eor</code>
+                        <p>Clear all EOR data</p>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method delete">DELETE</span>
+                        <code>/eor/:id</code>
+                        <p>Delete specific EOR data</p>
+                    </div>
+                </div>
+                
+                <div class="endpoint-group">
+                    <h3>System</h3>
+                    <div class="endpoint">
+                        <span class="method get">GET</span>
+                        <code>/health</code>
+                        <p>Health check endpoint</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `);
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -353,7 +831,12 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[Mock EHR] Server is running on http://localhost:${PORT}`);
-  console.log(`[Mock EHR] Available endpoints:`);
+  console.log(`[Mock EHR] Web Interface:`);
+  console.log(`  GET    / - Main Dashboard`);
+  console.log(`  GET    /donors-interface - Donor Management Interface`);
+  console.log(`  GET    /eor-interface - EOR Data Browser`);
+  console.log(`  GET    /api-docs - API Documentation`);
+  console.log(`[Mock EHR] REST API endpoints:`);
   console.log(`  GET    /donors - Get all donors`);
   console.log(`  GET    /donors/:id - Get donor by ID`);
   console.log(`  POST   /donors - Add new donor`);

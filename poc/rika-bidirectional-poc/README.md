@@ -131,15 +131,32 @@ C4Container
    - Donor CRUD operations
    - Selection tracking and status updates
    - RESTful API for middleware integration
+   - **Web Interface** for donor management and EOR data browsing
 
 ## Workflow
 
+### Device Workflow (Camel Middleware)
 1. **Browse Donors**: Device loads donor list with photos and status
 2. **Select Donor**: Click on donor card to view details
 3. **Confirm Selection**: Review details and confirm to update EHR
 4. **Cookie Storage**: Donor ID stored in browser cookie for tracking
 
+### EHR Management Workflow (Mock EHR Web Interface)
+1. **Dashboard**: Access main dashboard at http://localhost:3001
+2. **Donor Management**: Add new donors with comprehensive form including:
+   - Full name, first/last name
+   - Date of birth, blood group
+   - Status (not-available, checked-in, donating, donated)
+   - Category (Individual/Corporate)
+3. **EOR Data Browser**: View and manage End of Run data:
+   - Browse all EOR records in a table format
+   - View detailed JSON data in modal popups
+   - Delete individual records or clear all data
+   - Real-time refresh capabilities
+
 ## API Endpoints
+
+### Apache Camel Middleware (Port 8080)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -148,6 +165,29 @@ C4Container
 | GET | `/donors/donor/{id}` | JSON donor data |
 | POST | `/donors/select/donor` | Donor selection API |
 | GET | `/donors/images/{filename}` | Serve donor photos |
+
+### Mock EHR Web Interface (Port 3001)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Main dashboard with navigation |
+| GET | `/donors-interface` | Donor management interface |
+| GET | `/eor-interface` | EOR data browser |
+| GET | `/api-docs` | API documentation |
+
+### Mock EHR REST API (Port 3001)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/donors` | Get all donors |
+| GET | `/donors/:id` | Get donor by ID |
+| POST | `/donors` | Add new donor |
+| PUT | `/donors/:id` | Update donor |
+| DELETE | `/donors/:id` | Delete donor |
+| POST | `/donors/select` | Select donor for processing |
+| GET | `/eor` | Get all EOR data |
+| POST | `/eor` | Submit EOR data |
+| DELETE | `/eor` | Clear all EOR data |
 
 ## Run Script Operations
 

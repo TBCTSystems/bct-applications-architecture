@@ -16,6 +16,7 @@ RUN npm install --only=production && npm cache clean --force
 
 # Copy application code
 COPY mock-ehr.js .
+COPY public/ ./public/
 
 # Change ownership to nodejs user
 RUN chown -R nodejs:nodejs /app
