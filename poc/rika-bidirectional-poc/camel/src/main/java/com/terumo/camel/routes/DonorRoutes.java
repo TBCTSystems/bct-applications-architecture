@@ -20,6 +20,9 @@ public class DonorRoutes extends RouteBuilder {
     
     @Autowired
     private com.terumo.camel.processor.DonorDetailsProcessor donorDetailsProcessor;
+    
+    // Cache for available donor image IDs
+    private java.util.List<Integer> availableImageIds = null;
 
     @Override
     public void configure() throws Exception {
@@ -224,12 +227,39 @@ public class DonorRoutes extends RouteBuilder {
                             int donorId = Integer.parseInt(donorIdStr);
                             
                             String actualFilename;
-                            if (donorId >= 1 && donorId <= 5) {
-                                // Use actual image for original donors (1-5)
+                            
+                            // First, try to find the exact image for this donor ID
+                            java.io.InputStream directImageStream = getClass().getClassLoader()
+                                .getResourceAsStream("static/images/" + filename);
+                            
+                            if (directImageStream != null) {
+                                // Direct image exists, use it
                                 actualFilename = filename;
+                                directImageStream.close();
                             } else {
-                                // For new donors (6+), randomly map to one of the existing images (1-5)
-                                int mappedId = ((donorId - 1) % 5) + 1; // Maps 6->1, 7->2, 8->3, 9->4, 10->5, 11->1, etc.
+                                // No direct image, use cached available images for consistent mapping
+                                if (availableImageIds == null) {
+                                    // Initialize cache by scanning for available images
+                                    availableImageIds = new java.util.ArrayList<>();
+                                    for (int i = 1; i <= 100; i++) { // Reasonable limit
+                                        String testFilename = "donor-" + i + ".jpeg";
+                                        java.io.InputStream testStream = getClass().getClassLoader()
+                                            .getResourceAsStream("static/images/" + testFilename);
+                                        if (testStream != null) {
+                                            availableImageIds.add(i);
+                                            testStream.close();
+                                        }
+                                    }
+                                    System.out.println("Found " + availableImageIds.size() + " available donor images: " + availableImageIds);
+                                }
+                                
+                                if (availableImageIds.isEmpty()) {
+                                    throw new RuntimeException("No donor images found");
+                                }
+                                
+                                // Use consistent hashing to map donor ID to available image
+                                int mappedIndex = Math.abs(donorId) % availableImageIds.size();
+                                int mappedId = availableImageIds.get(mappedIndex);
                                 actualFilename = "donor-" + mappedId + ".jpeg";
                             }
                             
