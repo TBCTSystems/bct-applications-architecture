@@ -97,6 +97,7 @@ let nextId = 6;
 let eorData = [];
 let nextEorId = 1;
 
+
 // Helper function to find donor by ID
 const findDonorById = (id) => donors.find(d => d.id === parseInt(id));
 
@@ -401,6 +402,10 @@ app.get('/donors-interface', (req, res) => {
       <td>${donor.name}</td>
       <td><span class="status-badge status-${donor.status}">${donor.status}</span></td>
       <td>${donor.category.name}</td>
+      <td>${donor.BG || 'N/A'}</td>
+      <td>${donor.HCT || 'N/A'}</td>
+      <td>${donor.WGHT || 'N/A'}</td>
+      <td>${donor.HGHT || 'N/A'}</td>
       <td>
         <button onclick="deleteDonor(${donor.id})" class="btn btn-danger btn-sm">Delete</button>
       </td>
@@ -463,6 +468,21 @@ app.get('/donors-interface', (req, res) => {
                         </div>
                         
                         <div class="form-group">
+                            <label for="hematocrit">Hematocrit (%)</label>
+                            <input type="number" id="hematocrit" name="hematocrit" min="0" max="100" step="0.1" placeholder="e.g., 40.5">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="weight">Weight (lbs)</label>
+                            <input type="number" id="weight" name="weight" min="0" step="0.1" placeholder="e.g., 150.5">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="height">Height (inches)</label>
+                            <input type="number" id="height" name="height" min="0" step="0.1" placeholder="e.g., 69.5">
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="status">Status *</label>
                             <select id="status" name="status" required>
                                 <option value="not-available">Not Available</option>
@@ -494,6 +514,10 @@ app.get('/donors-interface', (req, res) => {
                                     <th>Name</th>
                                     <th>Status</th>
                                     <th>Category</th>
+                                    <th>Blood Group</th>
+                                    <th>HCT (%)</th>
+                                    <th>Weight (lbs)</th>
+                                    <th>Height (in)</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -522,7 +546,9 @@ app.get('/donors-interface', (req, res) => {
                     LAST: formData.get('lastName') || formData.get('name').split(' ').slice(1).join(' '),
                     DOB: formData.get('dob') ? formData.get('dob').replace(/-/g, '') : '',
                     BG: formData.get('bloodGroup') || '',
-                    photoUrls: [],
+                    HCT: formData.get('hematocrit') || '',
+                    WGHT: formData.get('weight') || '',
+                    HGHT: formData.get('height') || '',
                     tags: []
                 };
                 
@@ -808,6 +834,7 @@ app.get('/api-docs', (req, res) => {
     </html>
   `);
 });
+
 
 // Health check endpoint
 app.get('/health', (req, res) => {

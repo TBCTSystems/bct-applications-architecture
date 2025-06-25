@@ -148,19 +148,6 @@
             font-size: 1.1em;
         }
         
-        .selection-info {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background-color: #4CAF50;
-            color: white;
-            padding: 12px 16px;
-            border-radius: 6px;
-            display: none;
-            z-index: 1000;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            font-size: 0.9em;
-        }
         
         @media (max-width: 768px) {
             .donor-grid {
@@ -196,12 +183,6 @@
                 margin-right: 12px;
             }
             
-            .selection-info {
-                top: 10px;
-                right: 10px;
-                left: 10px;
-                text-align: center;
-            }
         }
     </style>
 </head>
@@ -241,15 +222,10 @@
         </div>
     </div>
     
-    <div id="selectionInfo" class="selection-info">
-        <span id="selectionText">Donor selected successfully!</span>
-    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const donorCards = document.querySelectorAll('.donor-card');
-            const selectionInfo = document.getElementById('selectionInfo');
-            const selectionText = document.getElementById('selectionText');
             
             donorCards.forEach(card => {
                 card.addEventListener('click', function() {
@@ -262,25 +238,140 @@
                     const donorId = this.getAttribute('data-donor-id');
                     const donorName = this.getAttribute('data-donor-name');
                     
-                    // Show selection feedback
-                    selectionText.textContent = `Selected: ${donorName} (ID: ${donorId})`;
-                    selectionInfo.style.display = 'block';
-                    
-                    // Navigate directly to donor details page
-                    selectionText.textContent = `Opening details for ${donorName}...`;
-                    
-                    // Navigate to donor details page after a short delay
-                    setTimeout(() => {
-                        window.location.href = `/donors/donor/${donorId}/details`;
-                    }, 800);
+                    // Navigate directly to donor details page immediately
+                    window.location.href = `/donors/donor/${donorId}/details`;
                 });
             });
             
-            // Auto-refresh every 30 seconds
-            setInterval(() => {
-                window.location.reload();
-            }, 30000);
+            // Setup smart polling for real-time updates
+            setupSmartPolling();
         });
+
+        let lastDonorCount = document.querySelectorAll('.donor-card').length;
+        let lastUpdateHash = '';
+
+        function setupSmartPolling() {
+            console.log('Setting up smart polling for real-time donor updates...');
+            
+            // Calculate initial hash of donor data
+            updateLastHash();
+            
+            // Poll every 5 seconds for changes
+            setInterval(checkForUpdates, 5000);
+            
+            // Fallback full refresh every 2 minutes
+            setInterval(() => {
+                console.log('Fallback refresh triggered');
+                window.location.reload();
+            }, 120000);
+        }
+
+        function updateLastHash() {
+            const donorCards = document.querySelectorAll('.donor-card');
+            let hashData = '';
+            donorCards.forEach(card => {
+                hashData += card.getAttribute('data-donor-id') + ':' + card.getAttribute('data-donor-name') + ';';
+            });
+            lastUpdateHash = hashData;
+            lastDonorCount = donorCards.length;
+        }
+
+        async function checkForUpdates() {
+            try {
+                const response = await fetch('/donors/donor/list/api', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        console.log('Received non-JSON response, skipping update check');
+                        return;
+                    }
+                    
+                    const donors = await response.json();
+                    
+                    // Validate that we got an array
+                    if (!Array.isArray(donors)) {
+                        console.log('Received invalid donor data (not an array), skipping update check');
+                        return;
+                    }
+                    
+                    console.log(`Current donor count: ${donors.length}, Last count: ${lastDonorCount}`);
+                    
+                    // Check if donor count changed
+                    if (donors.length !== lastDonorCount) {
+                        console.log(`Donor count changed: ${lastDonorCount} -> ${donors.length}`);
+                        showUpdateNotification('Donor list updated!');
+                        setTimeout(() => window.location.reload(), 1000);
+                        return;
+                    }
+                    
+                    // Check if donor data changed (simple hash comparison)
+                    let currentHash = '';
+                    donors.forEach(donor => {
+                        currentHash += donor.id + ':' + donor.name + ';';
+                    });
+                    
+                    if (currentHash !== lastUpdateHash) {
+                        console.log('Donor data changed, refreshing...');
+                        showUpdateNotification('Donor information updated!');
+                        setTimeout(() => window.location.reload(), 1000);
+                    }
+                } else {
+                    console.log(`API request failed with status: ${response.status}`);
+                }
+            } catch (error) {
+                console.log('Polling check failed:', error.message);
+            }
+        }
+
+        function showUpdateNotification(message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #4CAF50;
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 1000;
+                font-family: inherit;
+                font-size: 14px;
+                font-weight: 500;
+                animation: slideIn 0.3s ease-out;
+            `;
+            notification.textContent = message;
+            
+            // Add animation keyframes
+            if (!document.getElementById('notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'notification-styles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
+        }
     </script>
 </body>
 </html>

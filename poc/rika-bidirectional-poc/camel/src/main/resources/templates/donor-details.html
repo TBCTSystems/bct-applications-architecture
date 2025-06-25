@@ -184,15 +184,6 @@
             transform: translateY(-2px);
         }
         
-        .btn-cancel {
-            background-color: #f44336;
-            color: white;
-        }
-        
-        .btn-cancel:hover {
-            background-color: #da190b;
-            transform: translateY(-2px);
-        }
         
         .btn-back {
             background-color: #6c757d;
@@ -258,7 +249,7 @@
         
         <div class="content">
             <div id="confirmationMessage" class="confirmation-message">
-                <strong>Success!</strong> Donor has been confirmed for the procedure.
+                <strong>Success!</strong> Donor has been confirmed for the procedure. The EHR system has been updated and cookies have been set for the selected donor.
             </div>
             
             <div th:if="${donors != null and !#lists.isEmpty(donors)}" class="donor-details">
@@ -349,9 +340,6 @@
                 <button class="btn btn-confirm" onclick="confirmDonor()">
                     ✓ Confirm Selection
                 </button>
-                <button class="btn btn-cancel" onclick="cancelSelection()">
-                    ✗ Cancel
-                </button>
                 <a href="/donors/donor/list" class="btn btn-back">
                     ← Back to List
                 </a>
@@ -402,21 +390,21 @@
                 console.log('EHR update attempted:', error);
             });
             
-            // Show confirmation alert
-            let cookiesSetMessage = `Cookies set: selectedDonorId=${donorId}`;
-            if (donorData.firs) cookiesSetMessage += `, FIRS=${donorData.firs}`;
-            // Add other fields to message if needed for verbosity in alert
-            alert(`${cookiesSetMessage}. EHR UPDATED. This should now close the WebViewEngine.`);
+            // Show confirmation message
+            const confirmationMessage = document.getElementById('confirmationMessage');
+            confirmationMessage.style.display = 'block';
             
-            // Navigate back to list
-            window.location.href = '/donors/donor/list';
+            // Disable the confirm button to prevent multiple submissions
+            const confirmButton = document.querySelector('.btn-confirm');
+            confirmButton.disabled = true;
+            confirmButton.textContent = '✓ Confirmed';
+            confirmButton.style.backgroundColor = '#28a745';
+            confirmButton.style.cursor = 'not-allowed';
+            
+            // Scroll to top to show the confirmation message
+            window.scrollTo(0, 0);
         }
         
-        function cancelSelection() {
-            if (confirm('Are you sure you want to cancel this selection?')) {
-                window.location.href = '/donors/donor/list';
-            }
-        }
         
         // Auto-focus on confirm button for accessibility
         document.addEventListener('DOMContentLoaded', function() {

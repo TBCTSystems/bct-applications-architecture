@@ -14,7 +14,7 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
 }
@@ -257,9 +257,20 @@ table {
 
 table th,
 table td {
-    padding: 12px;
+    padding: 8px 12px;
     text-align: left;
     border-bottom: 1px solid #e1e8ed;
+    white-space: nowrap;
+}
+
+table td:first-child,
+table th:first-child {
+    padding-left: 16px;
+}
+
+table td:last-child,
+table th:last-child {
+    padding-right: 16px;
 }
 
 table th {

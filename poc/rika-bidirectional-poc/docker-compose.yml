@@ -49,7 +49,7 @@ services:
 networks:
   donor-network:
     driver: bridge
-    name: donor-management-network
+    name: donor-management-network-2
 
 volumes:
   # Optional: Add volumes for logs if needed

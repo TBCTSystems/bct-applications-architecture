@@ -50,6 +50,13 @@ public class DonorRoutes extends RouteBuilder {
                 .produces("text/html")
                 .to("direct:getDonorsAsHtml")
             
+            // GET /donor/list/api - Returns JSON donor list for polling
+            .get("/list/api")
+                .description("Get donor list as JSON for polling")
+                .produces("application/json")
+                .bindingMode(RestBindingMode.off)
+                .to("direct:getDonorsAsJson")
+            
             // GET /donor/{donorId} - Get specific donor
             .get("/{donorId}")
                 .description("Find donor by ID")
@@ -97,6 +104,8 @@ public class DonorRoutes extends RouteBuilder {
                 .produces("image/jpeg")
                 .to("direct:serveImage");
 
+
+
         // End of Run (EoR) endpoint
         rest("/eor")
             .description("End of Run data operations")
@@ -115,6 +124,21 @@ public class DonorRoutes extends RouteBuilder {
             .to("direct:fetchDonorsFromEhr")
             .process(htmlGenerationProcessor)
             .setHeader("Content-Type", constant("text/html; charset=UTF-8"));
+
+        // Get donors as JSON for polling
+        from("direct:getDonorsAsJson")
+            .routeId("getDonorsAsJson")
+            .log("Fetching donors from EHR for JSON API")
+            .setHeader("CamelHttpMethod", constant("GET"))
+            .setHeader("Accept", constant("application/json"))
+            .to(ehrBaseUrl + "/donors?bridgeEndpoint=true")
+            .convertBodyTo(String.class)
+            .process(exchange -> {
+                // Ensure we're returning raw JSON, not a JSON-encoded string
+                String jsonResponse = exchange.getIn().getBody(String.class);
+                exchange.getIn().setBody(jsonResponse);
+                exchange.getIn().setHeader("Content-Type", "application/json");
+            });
 
         // Get donor by ID
         from("direct:getDonorById")
@@ -189,17 +213,31 @@ public class DonorRoutes extends RouteBuilder {
             .routeId("serveImage")
             .log("Serving image: ${header.filename}")
             .choice()
-                .when(header("filename").regex("donor-[1-5]\\.jpeg"))
+                .when(header("filename").regex("donor-\\d+\\.jpeg"))
                     .setHeader("Content-Type", constant("image/jpeg"))
                     .setHeader("Cache-Control", constant("public, max-age=86400"))
                     .process(exchange -> {
                         String filename = exchange.getIn().getHeader("filename", String.class);
                         try {
+                            // Extract donor ID from filename (e.g., "donor-123.jpeg" -> 123)
+                            String donorIdStr = filename.replaceAll("donor-(\\d+)\\.jpeg", "$1");
+                            int donorId = Integer.parseInt(donorIdStr);
+                            
+                            String actualFilename;
+                            if (donorId >= 1 && donorId <= 5) {
+                                // Use actual image for original donors (1-5)
+                                actualFilename = filename;
+                            } else {
+                                // For new donors (6+), randomly map to one of the existing images (1-5)
+                                int mappedId = ((donorId - 1) % 5) + 1; // Maps 6->1, 7->2, 8->3, 9->4, 10->5, 11->1, etc.
+                                actualFilename = "donor-" + mappedId + ".jpeg";
+                            }
+                            
                             java.io.InputStream imageStream = getClass().getClassLoader()
-                                .getResourceAsStream("static/images/" + filename);
+                                .getResourceAsStream("static/images/" + actualFilename);
                             if (imageStream == null) {
                                 // Try to read from file system if not in resources
-                                java.nio.file.Path imagePath = java.nio.file.Paths.get(filename);
+                                java.nio.file.Path imagePath = java.nio.file.Paths.get(actualFilename);
                                 if (java.nio.file.Files.exists(imagePath)) {
                                     byte[] imageBytes = java.nio.file.Files.readAllBytes(imagePath);
                                     exchange.getIn().setBody(imageBytes);
@@ -261,5 +299,7 @@ public class DonorRoutes extends RouteBuilder {
             .to(ehrBaseUrl + "/eor?bridgeEndpoint=true")
             .convertBodyTo(String.class)
             .log("EoR data submitted successfully: ${body}");
+
+
     }
 }
