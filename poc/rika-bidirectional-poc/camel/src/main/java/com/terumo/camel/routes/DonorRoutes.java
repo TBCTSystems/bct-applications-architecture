@@ -21,6 +21,9 @@ public class DonorRoutes extends RouteBuilder {
     @Autowired
     private com.terumo.camel.processor.DonorDetailsProcessor donorDetailsProcessor;
     
+    @Autowired
+    private com.terumo.camel.processor.BarcodeScreenProcessor barcodeScreenProcessor;
+    
     // Cache for available donor image IDs
     private java.util.List<Integer> availableImageIds = null;
 
@@ -117,6 +120,28 @@ public class DonorRoutes extends RouteBuilder {
                 .consumes("application/json")
                 .produces("application/json")
                 .to("direct:submitEorData");
+
+        // Barcode scanning endpoints
+        rest("/barcode")
+            .description("Barcode scanning operations")
+            
+            // Collection ID barcode scanning
+            .get("/collection-id")
+                .description("Collection ID barcode scanning interface")
+                .produces("text/html")
+                .to("direct:getCollectionIdBarcodeScreen")
+            
+            // Plasma Container barcode scanning
+            .get("/plasma-container")
+                .description("Plasma Container barcode scanning interface")
+                .produces("text/html")
+                .to("direct:getPlasmaContainerBarcodeScreen")
+            
+            // Separation Set barcode scanning
+            .get("/separation-set")
+                .description("Separation Set barcode scanning interface")
+                .produces("text/html")
+                .to("direct:getSeparationSetBarcodeScreen");
 
         // Route implementations
         
@@ -330,6 +355,41 @@ public class DonorRoutes extends RouteBuilder {
             .convertBodyTo(String.class)
             .log("EoR data submitted successfully: ${body}");
 
+        // Barcode scanning screen routes
+        
+        // Collection ID barcode scanning screen
+        from("direct:getCollectionIdBarcodeScreen")
+            .routeId("getCollectionIdBarcodeScreen")
+            .log("Generating Collection ID barcode scanning screen")
+            .process(exchange -> {
+                exchange.getIn().setBody("collection-id");
+            })
+            .to("direct:generateBarcodeScreen");
+
+        // Plasma Container barcode scanning screen
+        from("direct:getPlasmaContainerBarcodeScreen")
+            .routeId("getPlasmaContainerBarcodeScreen")
+            .log("Generating Plasma Container barcode scanning screen")
+            .process(exchange -> {
+                exchange.getIn().setBody("plasma-container");
+            })
+            .to("direct:generateBarcodeScreen");
+
+        // Separation Set barcode scanning screen
+        from("direct:getSeparationSetBarcodeScreen")
+            .routeId("getSeparationSetBarcodeScreen")
+            .log("Generating Separation Set barcode scanning screen")
+            .process(exchange -> {
+                exchange.getIn().setBody("separation-set");
+            })
+            .to("direct:generateBarcodeScreen");
+
+        // Common barcode screen generation
+        from("direct:generateBarcodeScreen")
+            .routeId("generateBarcodeScreen")
+            .log("Generating barcode screen for type: ${body}")
+            .process(barcodeScreenProcessor)
+            .setHeader("Content-Type", constant("text/html; charset=UTF-8"));
 
     }
 }

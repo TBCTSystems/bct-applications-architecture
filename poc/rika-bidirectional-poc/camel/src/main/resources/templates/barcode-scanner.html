@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title + ' - Barcode Scanner'}">Barcode Scanner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        
+        .scanner-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scanner-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: var(--primary-color, #4CAF50);
+        }
+
+        .operator-info {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            font-size: 0.85em;
+            color: #666;
+            opacity: 0.8;
+        }
+
+        .scanner-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: var(--primary-color, #4CAF50);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.5em;
+        }
+
+        .scanner-title {
+            font-size: 2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .scanner-description {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+            line-height: 1.5;
+        }
+
+        .barcode-input-group {
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        .barcode-input {
+            width: 100%;
+            padding: 18px 20px;
+            font-size: 1.2em;
+            border: 3px solid #e0e0e0;
+            border-radius: 12px;
+            outline: none;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            text-align: center;
+            letter-spacing: 1px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .barcode-input:focus {
+            border-color: var(--primary-color, #4CAF50);
+            background: white;
+            box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.2);
+        }
+
+        .barcode-input.valid {
+            background: #e8f5e8;
+            border-color: #4CAF50;
+        }
+
+        .barcode-input.invalid {
+            background: #ffeaea;
+            border-color: #e74c3c;
+        }
+
+        .input-label {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: white;
+            padding: 0 8px;
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 140px;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: var(--primary-color, #4CAF50);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .status-indicator {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .barcode-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .regex-info {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            word-break: break-all;
+            margin-top: 8px;
+            padding: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+
+        /* Popup styles */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .popup {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .popup-icon {
+            font-size: 4em;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        .popup-title {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .popup-message {
+            color: #7f8c8d;
+            font-size: 1.1em;
+            line-height: 1.5;
+        }
+
+        /* Responsive design */
+        @media (max-width: 600px) {
+            .scanner-container {
+                padding: 30px 20px;
+                margin: 20px;
+            }
+
+            .scanner-title {
+                font-size: 1.6em;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+
+        /* Animation for scanner icon */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .scanner-icon.scanning {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="scanner-container">
+        <div class="operator-info" th:if="${operatorId != 'unknown'}">
+            Operator: <span th:text="${operatorId}">OP-001</span>
+        </div>
+
+        <div class="scanner-icon">
+            📷
+        </div>
+
+        <h1 class="scanner-title" th:text="${title}">Barcode Scanner</h1>
+        <p class="scanner-description" th:text="${description}">Scan or enter the barcode</p>
+
+        <div class="barcode-input-group">
+            <label class="input-label">Barcode Data</label>
+            <input 
+                type="text" 
+                id="barcodeInput" 
+                class="barcode-input" 
+                placeholder="Scan barcode or type manually..."
+                autocomplete="off"
+                spellcheck="false"
+            >
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-primary" id="confirmBtn" onclick="processBarcode()" disabled>
+                Confirm Scan
+            </button>
+            <button class="btn btn-danger" id="deleteBtn" onclick="clearBarcode()" disabled>
+                Delete
+            </button>
+        </div>
+
+        <div id="statusIndicator" class="status-indicator"></div>
+
+        <div class="barcode-info">
+            <strong>Barcode Type:</strong> <span th:text="${title}">Collection ID</span><br>
+            <strong>Regex Pattern:</strong>
+            <div class="regex-info" th:text="${encodedRegex}">Base64 encoded regex</div>
+        </div>
+    </div>
+
+    <!-- Confirmation Popup -->
+    <div class="popup-overlay" id="popupOverlay">
+        <div class="popup">
+            <div class="popup-icon">✓</div>
+            <h2 class="popup-title">Confirmed!</h2>
+            <p class="popup-message">Barcode has been validated and confirmed.<br><strong>Please close the browser.</strong></p>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        // Get the barcode type and encoded regex from Thymeleaf
+        const barcodeType = /*[[${barcodeType}]]*/ 'collection-id';
+        const encodedRegex = /*[[${encodedRegex}]]*/ '';
+        const primaryColor = /*[[${primaryColor}]]*/ '#4CAF50';
+        
+        // Set the primary color dynamically
+        document.documentElement.style.setProperty('--primary-color', primaryColor);
+        
+        const barcodeInput = document.getElementById('barcodeInput');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const confirmBtn = document.getElementById('confirmBtn');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const scannerIcon = document.querySelector('.scanner-icon');
+        const popupOverlay = document.getElementById('popupOverlay');
+
+        // Decode the base64 regex pattern
+        let decodedRegex = null;
+        try {
+            const decodedPattern = atob(encodedRegex);
+            decodedRegex = new RegExp(decodedPattern);
+            console.log('Decoded regex pattern:', decodedPattern);
+        } catch (error) {
+            console.error('Failed to decode regex pattern:', error);
+            showStatus('Invalid regex pattern configuration', 'error');
+        }
+
+        // Set the encoded regex as a cookie for the device to read
+        document.cookie = `barcodeRegex_${barcodeType}=${encodedRegex}; path=/`;
+
+        // Focus on input when page loads
+        window.addEventListener('load', () => {
+            barcodeInput.focus();
+        });
+
+        // Validate barcode input in real-time
+        barcodeInput.addEventListener('input', function() {
+            const value = this.value.trim();
+            deleteBtn.disabled = value === '';
+            
+            if (value === '') {
+                // Empty input
+                this.classList.remove('valid', 'invalid');
+                confirmBtn.disabled = true;
+                hideStatus();
+            } else if (decodedRegex && decodedRegex.test(value)) {
+                // Valid barcode
+                this.classList.remove('invalid');
+                this.classList.add('valid');
+                confirmBtn.disabled = false;
+                showStatus('Valid barcode format', 'success');
+            } else {
+                // Invalid barcode
+                this.classList.remove('valid');
+                this.classList.add('invalid');
+                confirmBtn.disabled = true;
+                showStatus('Invalid barcode format', 'error');
+            }
+        });
+
+        // Handle Enter key for quick confirmation
+        barcodeInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !confirmBtn.disabled) {
+                processBarcode();
+            }
+        });
+
+        // Simulate scanning animation when input is focused
+        barcodeInput.addEventListener('focus', function() {
+            scannerIcon.classList.add('scanning');
+        });
+
+        barcodeInput.addEventListener('blur', function() {
+            scannerIcon.classList.remove('scanning');
+        });
+
+        function processBarcode() {
+            const barcodeData = barcodeInput.value.trim();
+            
+            if (!barcodeData) {
+                showStatus('Please enter or scan a barcode first', 'error');
+                barcodeInput.focus();
+                return;
+            }
+
+            if (!decodedRegex || !decodedRegex.test(barcodeData)) {
+                showStatus('Barcode format is invalid', 'error');
+                return;
+            }
+
+            // Set the BarcodeDefinitionCookie with the barcode type as key and scanned value as value
+            document.cookie = `BarcodeDefinitionCookie=${barcodeType}=${encodeURIComponent(barcodeData)}; path=/`;
+            
+            // Show confirmation popup
+            popupOverlay.style.display = 'flex';
+            
+            console.log(`Barcode confirmed: ${barcodeType} = ${barcodeData}`);
+        }
+
+        function clearBarcode() {
+            barcodeInput.value = '';
+            barcodeInput.classList.remove('valid', 'invalid');
+            deleteBtn.disabled = true;
+            confirmBtn.disabled = true;
+            
+            // Clear the stored barcode data cookie
+            document.cookie = `BarcodeDefinitionCookie=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            
+            showStatus('Barcode data cleared', 'success');
+            barcodeInput.focus();
+        }
+
+        function showStatus(message, type) {
+            clearTimeout(window.statusTimeout);
+            statusIndicator.textContent = message;
+            statusIndicator.className = `status-indicator status-${type}`;
+            statusIndicator.style.display = 'block';
+            
+            window.statusTimeout = setTimeout(() => {
+                hideStatus();
+            }, 3000);
+        }
+
+        function hideStatus() {
+            statusIndicator.style.display = 'none';
+        }
+
+        // Close popup when clicking outside (optional)
+        popupOverlay.addEventListener('click', function(e) {
+            if (e.target === popupOverlay) {
+                // Don't close automatically - user should close browser as instructed
+                // popupOverlay.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
