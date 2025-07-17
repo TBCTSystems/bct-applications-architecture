@@ -1,0 +1,76 @@
+{
+  "root": "/home/step/.step/certs/root_ca.crt",
+  "federatedRoots": null,
+  "crt": "/home/step/.step/certs/intermediate_ca.crt",
+  "key": "/home/step/.step/secrets/intermediate_ca_key",
+  "address": ":9000",
+  "insecureAddress": "",
+  "dnsNames": [
+    "step-ca",
+    "localhost",
+    "127.0.0.1"
+  ],
+  "logger": {
+    "format": "text"
+  },
+  "db": {
+    "type": "badgerv2",
+    "dataSource": "/home/step/.step/db",
+    "badgerFileLoadingMode": ""
+  },
+  "authority": {
+    "provisioners": [
+      {
+        "type": "JWK",
+        "name": "admin",
+        "key": {
+          "use": "sig",
+          "kty": "EC",
+          "kid": "admin-key-id",
+          "crv": "P-256",
+          "alg": "ES256",
+          "x": "placeholder-x-coordinate",
+          "y": "placeholder-y-coordinate"
+        },
+        "encryptedKey": "placeholder-encrypted-key"
+      },
+      {
+        "type": "ACME",
+        "name": "acme",
+        "forceCN": false,
+        "requireEAB": false,
+        "challenges": [
+          "http-01",
+          "dns-01",
+          "tls-alpn-01"
+        ],
+        "claims": {
+          "minTLSCertDuration": "5m",
+          "maxTLSCertDuration": "720h",
+          "defaultTLSCertDuration": "720h"
+        }
+      },
+      {
+        "type": "X5C",
+        "name": "x5c",
+        "roots": [
+          "/home/step/.step/certs/root_ca.crt"
+        ],
+        "claims": {
+          "minTLSCertDuration": "5m",
+          "maxTLSCertDuration": "720h",
+          "defaultTLSCertDuration": "720h"
+        }
+      }
+    ]
+  },
+  "tls": {
+    "cipherSuites": [
+      "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+      "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+    ],
+    "minVersion": 1.2,
+    "maxVersion": 1.3,
+    "renegotiation": false
+  }
+}

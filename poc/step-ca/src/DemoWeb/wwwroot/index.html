@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Certificate Management PoC Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card h2 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-healthy { background-color: #48bb78; }
+        .status-degraded { background-color: #ed8936; }
+        .status-error { background-color: #f56565; }
+        .status-unknown { background-color: #a0aec0; }
+
+        .service-list {
+            list-style: none;
+        }
+
+        .service-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .service-item:last-child {
+            border-bottom: none;
+        }
+
+        .service-name {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .service-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-running { background-color: #c6f6d5; color: #22543d; }
+        .status-stopped { background-color: #fed7d7; color: #742a2a; }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .mqtt-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f7fafc;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .mqtt-message {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .mqtt-topic {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.875rem;
+        }
+
+        .mqtt-payload {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #2d3748;
+            margin: 8px 0;
+            background: #f7fafc;
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        .mqtt-timestamp {
+            font-size: 0.75rem;
+            color: #718096;
+        }
+
+        .certificate-list {
+            list-style: none;
+        }
+
+        .certificate-item {
+            background: #f7fafc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #48bb78;
+        }
+
+        .cert-subject {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .cert-details {
+            font-size: 0.875rem;
+            color: #718096;
+        }
+
+        .cert-expiry {
+            font-size: 0.875rem;
+            color: #38a169;
+            font-weight: 500;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #718096;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: #e2e8f0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle.active {
+            background: #48bb78;
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle.active::after {
+            transform: translateX(26px);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Enterprise Certificate Management PoC</h1>
+            <p>Interactive Demo - Lumia 1.1 with step-ca, MQTT, and Device Simulation</p>
+        </div>
+
+        <div class="dashboard">
+            <!-- System Status Card -->
+            <div class="card">
+                <h2>
+                    <span class="status-indicator" id="overall-status"></span>
+                    System Status
+                </h2>
+                <div class="auto-refresh">
+                    <span>Auto-refresh:</span>
+                    <div class="toggle active" id="auto-refresh-toggle"></div>
+                </div>
+                <ul class="service-list" id="service-list">
+                    <li class="loading">Loading system status...</li>
+                </ul>
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="refreshStatus()">🔄 Refresh Status</button>
+                </div>
+            </div>
+
+            <!-- Provisioning Control Card -->
+            <div class="card">
+                <h2>🔧 Provisioning Control</h2>
+                <p style="margin-bottom: 15px; color: #718096;">
+                    Control the certificate provisioning service and manage IP whitelist.
+                </p>
+                <div>
+                    <button class="btn btn-success" onclick="enableProvisioning()">✅ Enable Provisioning</button>
+                    <button class="btn btn-danger" onclick="disableProvisioning()">❌ Disable Provisioning</button>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="ip-input" placeholder="Enter IP address (e.g., 192.168.1.100)" />
+                    <button class="btn" onclick="addToWhitelist()">➕ Add to Whitelist</button>
+                </div>
+                <div id="provisioning-status" style="margin-top: 10px; font-size: 0.875rem;"></div>
+            </div>
+
+            <!-- Certificate Status Card -->
+            <div class="card">
+                <h2>📜 Certificate Status</h2>
+                <ul class="certificate-list" id="certificate-list">
+                    <li class="loading">Loading certificates...</li>
+                </ul>
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="refreshCertificates()">🔄 Refresh Certificates</button>
+                </div>
+            </div>
+
+            <!-- Device Status Card -->
+            <div class="card">
+                <h2>🤖 Device Status</h2>
+                <div id="device-status">
+                    <div class="service-item">
+                        <div>
+                            <div class="service-name">REVEOS-SIM-001</div>
+                            <div style="font-size: 0.875rem; color: #718096;">Reveos Device Simulator</div>
+                        </div>
+                        <span class="service-status status-running">Operational</span>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="simulateDeviceEvent()">⚡ Simulate Event</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MQTT Messages Card (Full Width) -->
+        <div class="card">
+            <h2>📡 Live MQTT Messages</h2>
+            <p style="margin-bottom: 15px; color: #718096;">
+                Real-time MQTT traffic between Lumia application and device simulators.
+            </p>
+            <div class="mqtt-messages" id="mqtt-messages">
+                <div class="loading">Loading MQTT messages...</div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn" onclick="refreshMqttMessages()">🔄 Refresh Messages</button>
+                <button class="btn" onclick="clearMqttMessages()">🗑️ Clear Messages</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefresh = true;
+        let refreshInterval;
+
+        // Initialize the demo
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshStatus();
+            refreshCertificates();
+            refreshMqttMessages();
+            startAutoRefresh();
+            
+            // Setup auto-refresh toggle
+            document.getElementById('auto-refresh-toggle').addEventListener('click', toggleAutoRefresh);
+        });
+
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            
+            if (autoRefresh) {
+                refreshInterval = setInterval(() => {
+                    refreshStatus();
+                    refreshMqttMessages();
+                }, 5000); // Refresh every 5 seconds
+            }
+        }
+
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            const toggle = document.getElementById('auto-refresh-toggle');
+            toggle.classList.toggle('active', autoRefresh);
+            startAutoRefresh();
+        }
+
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/demo/status');
+                const status = await response.json();
+                
+                updateOverallStatus(status.overallStatus);
+                updateServiceList(status);
+            } catch (error) {
+                console.error('Failed to refresh status:', error);
+                showError('Failed to load system status');
+            }
+        }
+
+        function updateOverallStatus(status) {
+            const indicator = document.getElementById('overall-status');
+            indicator.className = 'status-indicator';
+            
+            switch (status.toLowerCase()) {
+                case 'healthy':
+                    indicator.classList.add('status-healthy');
+                    break;
+                case 'degraded':
+                    indicator.classList.add('status-degraded');
+                    break;
+                case 'error':
+                    indicator.classList.add('status-error');
+                    break;
+                default:
+                    indicator.classList.add('status-unknown');
+            }
+        }
+
+        function updateServiceList(status) {
+            const serviceList = document.getElementById('service-list');
+            const services = [
+                { name: 'step-ca Certificate Authority', status: status.stepCA?.status || 'Unknown' },
+                { name: 'Provisioning Service', status: status.provisioningService?.status || 'Unknown' },
+                { name: 'MQTT Broker (Mosquitto)', status: status.mqttBroker?.status || 'Unknown' },
+                { name: 'Lumia 1.1 Application', status: status.lumiaApp?.status || 'Unknown' }
+            ];
+
+            serviceList.innerHTML = services.map(service => `
+                <li class="service-item">
+                    <div class="service-name">${service.name}</div>
+                    <span class="service-status ${getStatusClass(service.status)}">${service.status}</span>
+                </li>
+            `).join('');
+        }
+
+        function getStatusClass(status) {
+            switch (status.toLowerCase()) {
+                case 'healthy':
+                case 'running':
+                case 'operational':
+                    return 'status-running';
+                default:
+                    return 'status-stopped';
+            }
+        }
+
+        async function refreshCertificates() {
+            try {
+                const response = await fetch('/api/demo/certificates');
+                const certificates = await response.json();
+                
+                const certList = document.getElementById('certificate-list');
+                certList.innerHTML = certificates.map(cert => `
+                    <li class="certificate-item">
+                        <div class="cert-subject">${cert.subject}</div>
+                        <div class="cert-details">
+                            Owner: ${cert.owner}<br>
+                            Serial: ${cert.serialNumber}
+                        </div>
+                        <div class="cert-expiry">
+                            Expires: ${new Date(cert.notAfter).toLocaleDateString()} 
+                            (${Math.ceil(cert.timeUntilExpiry?.totalDays || 0)} days)
+                        </div>
+                    </li>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to refresh certificates:', error);
+                showError('Failed to load certificates');
+            }
+        }
+
+        async function refreshMqttMessages() {
+            try {
+                const response = await fetch('/api/demo/mqtt/messages');
+                const messages = await response.json();
+                
+                const mqttContainer = document.getElementById('mqtt-messages');
+                mqttContainer.innerHTML = messages.map(msg => `
+                    <div class="mqtt-message">
+                        <div class="mqtt-topic">${msg.topic}</div>
+                        <div class="mqtt-payload">${formatJson(msg.payload)}</div>
+                        <div class="mqtt-timestamp">${new Date(msg.timestamp).toLocaleString()}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to refresh MQTT messages:', error);
+                showError('Failed to load MQTT messages');
+            }
+        }
+
+        function formatJson(jsonString) {
+            try {
+                const obj = JSON.parse(jsonString);
+                return JSON.stringify(obj, null, 2);
+            } catch {
+                return jsonString;
+            }
+        }
+
+        async function enableProvisioning() {
+            try {
+                const response = await fetch('/api/demo/provisioning/enable', { method: 'POST' });
+                const result = await response.json();
+                showSuccess('Provisioning service enabled');
+                refreshStatus();
+            } catch (error) {
+                showError('Failed to enable provisioning service');
+            }
+        }
+
+        async function disableProvisioning() {
+            try {
+                const response = await fetch('/api/demo/provisioning/disable', { method: 'POST' });
+                const result = await response.json();
+                showSuccess('Provisioning service disabled');
+                refreshStatus();
+            } catch (error) {
+                showError('Failed to disable provisioning service');
+            }
+        }
+
+        async function addToWhitelist() {
+            const ipInput = document.getElementById('ip-input');
+            const ipAddress = ipInput.value.trim();
+            
+            if (!ipAddress) {
+                showError('Please enter an IP address');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/demo/whitelist/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ipAddress })
+                });
+                
+                const result = await response.json();
+                showSuccess(`IP ${ipAddress} added to whitelist`);
+                ipInput.value = '';
+            } catch (error) {
+                showError('Failed to add IP to whitelist');
+            }
+        }
+
+        function simulateDeviceEvent() {
+            const events = ['calibration_completed', 'maintenance_required', 'temperature_warning', 'cycle_completed'];
+            const eventType = events[Math.floor(Math.random() * events.length)];
+            
+            showSuccess(`Simulated device event: ${eventType}`);
+            
+            // Refresh messages to show the simulated event
+            setTimeout(refreshMqttMessages, 1000);
+        }
+
+        function clearMqttMessages() {
+            document.getElementById('mqtt-messages').innerHTML = '<div class="loading">Messages cleared</div>';
+        }
+
+        function showSuccess(message) {
+            const statusDiv = document.getElementById('provisioning-status');
+            statusDiv.innerHTML = `<span style="color: #38a169;">✅ ${message}</span>`;
+            setTimeout(() => statusDiv.innerHTML = '', 3000);
+        }
+
+        function showError(message) {
+            const statusDiv = document.getElementById('provisioning-status');
+            statusDiv.innerHTML = `<span style="color: #e53e3e;">❌ ${message}</span>`;
+            setTimeout(() => statusDiv.innerHTML = '', 3000);
+        }
+    </script>
+</body>
+</html>

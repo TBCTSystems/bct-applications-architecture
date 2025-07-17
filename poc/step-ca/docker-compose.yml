@@ -1,0 +1,214 @@
+# Docker Compose for Enterprise Certificate Management PoC
+
+services:
+  # step-ca Certificate Authority (Root CA)
+  step-ca:
+    image: smallstep/step-ca:latest
+    container_name: enterprise-step-ca
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./step-ca-config:/home/step/.step
+      - ./certificates:/home/step/certs
+    environment:
+      - DOCKER_STEPCA_INIT_NAME=Enterprise Root CA
+      - DOCKER_STEPCA_INIT_DNS_NAMES=step-ca,localhost,127.0.0.1
+      - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
+      - DOCKER_STEPCA_INIT_PASSWORD=enterprise-ca-password
+    networks:
+      - enterprise-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://localhost:9000/health", "--insecure"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Mosquitto MQTT Broker with mTLS
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: enterprise-mosquitto
+    ports:
+      - "8883:8883"  # MQTT over TLS
+      - "9001:9001"  # WebSocket over TLS
+    volumes:
+      - ./mosquitto-config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto-config/acl.conf:/mosquitto/config/acl.conf:ro
+      - ./certificates:/mosquitto/certs:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-logs:/mosquitto/log
+    networks:
+      - enterprise-net
+    depends_on:
+      step-ca:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub --help > /dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Provisioning Service (.NET)
+  provisioning-service:
+    build:
+      context: ./src/ProvisioningService
+      dockerfile: Dockerfile
+    container_name: enterprise-provisioning
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:5001;http://+:5000
+      - StepCA__BaseUrl=https://step-ca:9000
+      - StepCA__RootCertPath=/app/certs/root_ca.crt
+    volumes:
+      - ./certificates:/app/certs:ro
+      - provisioning-data:/app/data
+      - provisioning-logs:/app/logs
+    networks:
+      - enterprise-net
+    depends_on:
+      step-ca:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Lumia 1.1 Application (.NET)
+  lumia-app:
+    build:
+      context: ./src/LumiaApp
+      dockerfile: Dockerfile
+    container_name: enterprise-lumia
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - StepCA__BaseUrl=https://step-ca:9000
+      - ProvisioningService__BaseUrl=https://provisioning-service:5001
+      - MQTT__BrokerHost=mosquitto
+      - MQTT__BrokerPort=8883
+    volumes:
+      - ./certificates:/app/certs:ro
+      - lumia-data:/app/data
+      - lumia-logs:/app/logs
+    networks:
+      - enterprise-net
+    depends_on:
+      step-ca:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      provisioning-service:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'LumiaApp' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Reveos Device Simulator (.NET)
+  reveos-simulator:
+    build:
+      context: ./src/ReveosSimpleMocker
+      dockerfile: Dockerfile
+    container_name: enterprise-reveos-sim
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - StepCA__BaseUrl=https://step-ca:9000
+      - ProvisioningService__BaseUrl=https://provisioning-service:5001
+      - MQTT__BrokerHost=mosquitto
+      - MQTT__BrokerPort=8883
+      - Device__Id=REVEOS-SIM-001
+    volumes:
+      - ./certificates:/app/certs:ro
+      - reveos-data:/app/data
+      - reveos-logs:/app/logs
+    networks:
+      - enterprise-net
+    depends_on:
+      step-ca:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      provisioning-service:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'ReveosSimpleMocker' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MQTT Certificate Manager
+  mqtt-cert-manager:
+    image: smallstep/step-cli:latest
+    container_name: mqtt-cert-manager
+    volumes:
+      - ./mqtt-cert-manager.sh:/usr/local/bin/mqtt-cert-manager.sh:ro
+      - ./certificates:/mosquitto/certs
+      - mqtt-cert-manager-data:/etc/mqtt-cert-manager
+      - mqtt-cert-manager-logs:/var/log
+    environment:
+      - STEP_CA_URL=https://step-ca:9000
+      - CERT_RENEWAL_THRESHOLD_DAYS=7
+    networks:
+      - enterprise-net
+    depends_on:
+      step-ca:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["/bin/sh", "-c", "chmod +x /usr/local/bin/mqtt-cert-manager.sh && /usr/local/bin/mqtt-cert-manager.sh daemon"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/mqtt-cert-manager.sh", "status"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+
+  # Demo Web Interface
+  demo-web:
+    build:
+      context: ./src/DemoWeb
+      dockerfile: Dockerfile
+    container_name: enterprise-demo
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Services__StepCA=https://step-ca:9000
+      - Services__ProvisioningService=https://provisioning-service:5001
+      - Services__MQTT=mosquitto:8883
+    networks:
+      - enterprise-net
+    depends_on:
+      - step-ca
+      - mosquitto
+      - provisioning-service
+      - lumia-app
+      - reveos-simulator
+    restart: unless-stopped
+
+volumes:
+  step-ca-data:
+  mosquitto-data:
+  mosquitto-logs:
+  lumia-data:
+  lumia-logs:
+  reveos-data:
+  reveos-logs:
+  provisioning-data:
+  provisioning-logs:
+  mqtt-cert-manager-data:
+  mqtt-cert-manager-logs:
+
+networks:
+  enterprise-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

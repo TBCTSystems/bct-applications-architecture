@@ -1,0 +1,37 @@
+# MQTT Certificate Manager Service
+# This service handles automatic certificate renewal for Mosquitto
+
+version: '3.8'
+
+services:
+  mqtt-cert-manager:
+    image: smallstep/step-cli:latest
+    container_name: mqtt-cert-manager
+    volumes:
+      - ./mqtt-cert-manager.sh:/usr/local/bin/mqtt-cert-manager.sh:ro
+      - ./certificates:/mosquitto/certs
+      - mqtt-cert-manager-data:/etc/mqtt-cert-manager
+      - mqtt-cert-manager-logs:/var/log
+    environment:
+      - STEP_CA_URL=https://step-ca:9000
+      - CERT_RENEWAL_THRESHOLD_DAYS=7
+    networks:
+      - enterprise-net
+    depends_on:
+      step-ca:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["/bin/sh", "-c", "chmod +x /usr/local/bin/mqtt-cert-manager.sh && /usr/local/bin/mqtt-cert-manager.sh daemon"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/mqtt-cert-manager.sh", "status"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+
+volumes:
+  mqtt-cert-manager-data:
+  mqtt-cert-manager-logs:
+
+networks:
+  enterprise-net:
+    external: true
