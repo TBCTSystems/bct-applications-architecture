@@ -26,11 +26,16 @@ public class HtmlGenerationProcessor implements Processor {
         String jsonBody = exchange.getIn().getBody(String.class);
         
         // Parse JSON to List of Donors
-        List<Donor> donors = objectMapper.readValue(jsonBody, new TypeReference<List<Donor>>() {});
+        List<Donor> allDonors = objectMapper.readValue(jsonBody, new TypeReference<List<Donor>>() {});
         
-        // Create Thymeleaf context and add donors
+        // Filter donors to only show those with "checked-in" status
+        List<Donor> checkedInDonors = allDonors.stream()
+            .filter(donor -> "checked-in".equals(donor.getStatus().getValue()))
+            .collect(java.util.stream.Collectors.toList());
+        
+        // Create Thymeleaf context and add filtered donors
         Context context = new Context();
-        context.setVariable("donors", donors);
+        context.setVariable("donors", checkedInDonors);
         context.setVariable("title", "Donor Management System");
         context.setVariable("timestamp", java.time.LocalDateTime.now().toString());
 

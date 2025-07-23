@@ -145,14 +145,24 @@ public class DonorRoutes extends RouteBuilder {
         from("direct:getDonorsAsJson")
             .routeId("getDonorsAsJson")
             .log("Fetching donors from EHR for JSON API")
-            .setHeader("CamelHttpMethod", constant("GET"))
-            .setHeader("Accept", constant("application/json"))
-            .to(ehrBaseUrl + "/donors?bridgeEndpoint=true")
-            .convertBodyTo(String.class)
+            .to("direct:fetchDonorsFromEhr")
             .process(exchange -> {
-                // Ensure we're returning raw JSON, not a JSON-encoded string
+                // Parse JSON to filter for checked-in donors only
                 String jsonResponse = exchange.getIn().getBody(String.class);
-                exchange.getIn().setBody(jsonResponse);
+                com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.core.type.TypeReference<java.util.List<com.terumo.camel.model.Donor>> typeRef = 
+                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<com.terumo.camel.model.Donor>>() {};
+                
+                java.util.List<com.terumo.camel.model.Donor> allDonors = objectMapper.readValue(jsonResponse, typeRef);
+                
+                // Filter for checked-in donors only
+                java.util.List<com.terumo.camel.model.Donor> checkedInDonors = allDonors.stream()
+                    .filter(donor -> "checked-in".equals(donor.getStatus().getValue()))
+                    .collect(java.util.stream.Collectors.toList());
+                
+                // Convert back to JSON
+                String filteredJson = objectMapper.writeValueAsString(checkedInDonors);
+                exchange.getIn().setBody(filteredJson);
                 exchange.getIn().setHeader("Content-Type", "application/json");
             });
 

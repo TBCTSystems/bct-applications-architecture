@@ -17,12 +17,12 @@ let donors = [
   {
     "id": 1,
     "category": { "id": 10, "name": "Individual" },
-    "name": "John Wayne",
-    "photoUrls": ["https://example.com/photos/john_wayne.jpg"],
+    "name": "Michael Johnson",
+    "photoUrls": ["https://example.com/photos/michael_johnson.jpg"],
     "tags": [{ "id": 1, "name": "VIP" }, { "id": 3, "name": "Regular" }],
-    "status": "donated",
-    "FIRS": "John",
-    "LAST": "Wayne",
+    "status": "checked-in",
+    "FIRS": "Michael",
+    "LAST": "Johnson",
     "DOB": "19970423",
     "HCT": "40",
     "WGHT": "140.7",
@@ -47,12 +47,12 @@ let donors = [
   {
     "id": 3,
     "category": { "id": 20, "name": "Corporate" },
-    "name": "MegaCorp Inc.",
+    "name": "TechFlow Solutions",
     "photoUrls": [],
     "tags": [{ "id": 4, "name": "Corporate" }],
-    "status": "not-available",
-    "FIRS": "MegaCorp",
-    "LAST": "Inc.",
+    "status": "checked-in",
+    "FIRS": "TechFlow",
+    "LAST": "Solutions",
     "DOB": "19970423",
     "HCT": "40",
     "WGHT": "140.7",
@@ -65,7 +65,7 @@ let donors = [
     "name": "Grace Kelly",
     "photoUrls": [],
     "tags": [{ "id": 1, "name": "VIP" }, { "id": 5, "name": "First-time" }],
-    "status": "donating",
+    "status": "checked-in",
     "FIRS": "Grace",
     "LAST": "Kelly",
     "DOB": "19970423",
@@ -88,10 +88,25 @@ let donors = [
     "WGHT": "140.7",
     "HGHT": "69.7",
     "BG": "M"
+  },
+  {
+    "id": 6,
+    "category": { "id": 10, "name": "Individual" },
+    "name": "Eric Donado",
+    "photoUrls": ["https://example.com/photos/eric_donado.jpg"],
+    "tags": [{ "id": 2, "name": "Recurring" }],
+    "status": "checked-in",
+    "FIRS": "Eric",
+    "LAST": "Donado",
+    "DOB": "19990410",
+    "HCT": "40",
+    "WGHT": "175",
+    "HGHT": "73",
+    "BG": "M"
   }
 ];
 
-let nextId = 6;
+let nextId = 7;
 
 // In-memory storage for End of Run (EOR) data
 let eorData = [];
@@ -165,7 +180,7 @@ app.post('/donors', (req, res) => {
     name: req.body.name,
     photoUrls: req.body.photoUrls || [],
     tags: req.body.tags || [],
-    status: req.body.status,
+    status: req.body.status || "checked-in", // Default to checked-in if not specified
     FIRS: req.body.FIRS || req.body.name.split(' ')[0] || '',
     LAST: req.body.LAST || req.body.name.split(' ').slice(1).join(' ') || '',
     DOB: req.body.DOB || '',
