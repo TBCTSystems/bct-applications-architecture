@@ -1,0 +1,407 @@
+version: '3.8'
+
+networks:
+  cert-mgmt-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  step-ca-data:
+  step-ca-secrets:
+  mosquitto-data:
+  mosquitto-logs:
+  grafana-data:
+  loki-data:
+  certs-device:
+  certs-app:
+  certs-mqtt:
+  certs-ca:
+
+services:
+  # Certificate Authority (step-ca)
+  step-ca:
+    image: smallstep/step-ca:latest
+    container_name: step-ca
+    hostname: stepca.local
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.10
+    ports:
+      - "9000:9000"
+    volumes:
+      - step-ca-data:/home/step
+    environment:
+      - DOCKER_STEPCA_INIT_NAME=Certificate Management PoC CA
+      - DOCKER_STEPCA_INIT_DNS_NAMES=ca.localtest.me,stepca.local,localhost
+      - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
+      - DOCKER_STEPCA_INIT_ACME=true
+      - DOCKER_STEPCA_INIT_PASSWORD=password
+    extra_hosts:
+      - "device.localtest.me:172.20.0.50"
+      - "app.localtest.me:172.20.0.60"
+      - "mqtt.localtest.me:172.20.0.70"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -k https://localhost:9000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=step-ca"
+
+  # MQTT Broker (Mosquitto)
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mosquitto
+    hostname: mqtt.local
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.20
+    ports:
+      - "1883:1883"  # Non-TLS for testing
+      - "8883:8883"  # TLS/mTLS
+      - "9001:9001"  # WebSocket
+    volumes:
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-logs:/mosquitto/log
+      - ./config/mosquitto:/mosquitto/config
+      - certs-mqtt:/mosquitto/certs
+      - certs-ca:/mosquitto/ca
+    depends_on:
+      step-ca:
+        condition: service_healthy
+      cert-automation:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t test -m 'health check' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=mosquitto"
+
+  # Loki (Log Aggregation)
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    hostname: loki.local
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.30
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+      - ./config/loki:/etc/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=loki"
+
+  # Grafana (Observability Dashboard)
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    hostname: grafana.local
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.40
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_LOG_LEVEL=info
+    depends_on:
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=grafana"
+
+  # Certbot for Device Certificates
+  certbot-device:
+    build:
+      context: ./docker/certbot
+      dockerfile: Dockerfile
+    container_name: certbot-device
+    hostname: device.local
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.50
+    ports:
+      - "8050:80"  # Fixed port for HTTP-01 challenge
+    volumes:
+      - certs-device:/certs
+      - certs-ca:/ca-certs
+      - ./scripts:/scripts
+    environment:
+      - SERVICE_NAME=device
+      - CERT_DOMAIN=device.localtest.me
+      - STEP_CA_URL=https://step-ca:9000
+      - RENEWAL_INTERVAL=300  # 5 minutes
+    depends_on:
+      step-ca:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=certbot-device"
+
+  # Certbot for Application Certificates
+  certbot-app:
+    build:
+      context: ./docker/certbot
+      dockerfile: Dockerfile
+    container_name: certbot-app
+    hostname: certbot-app.local
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.60
+    ports:
+      - "8060:80"  # Fixed port for HTTP-01 challenge
+    volumes:
+      - certs-app:/certs
+      - certs-ca:/ca-certs
+      - ./scripts:/scripts
+    environment:
+      - SERVICE_NAME=app
+      - CERT_DOMAIN=app.localtest.me
+      - STEP_CA_URL=https://step-ca:9000
+      - RENEWAL_INTERVAL=300  # 5 minutes
+    depends_on:
+      step-ca:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=certbot-app"
+
+  # Certbot for MQTT Broker Certificates
+  certbot-mqtt:
+    build:
+      context: ./docker/certbot
+      dockerfile: Dockerfile
+    container_name: certbot-mqtt
+    hostname: certbot-mqtt.local
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.70
+    ports:
+      - "8070:80"  # Fixed port for HTTP-01 challenge
+    volumes:
+      - certs-mqtt:/certs
+      - certs-ca:/ca-certs
+      - ./scripts:/scripts
+    environment:
+      - SERVICE_NAME=mqtt
+      - CERT_DOMAIN=mqtt.localtest.me
+      - STEP_CA_URL=https://step-ca:9000
+      - RENEWAL_INTERVAL=300  # 5 minutes
+    depends_on:
+      step-ca:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=certbot-mqtt"
+
+  # .NET Web API - Telemetry Consumer and SignalR Hub
+  web-api:
+    build:
+      context: ./src/WebApi
+      dockerfile: Dockerfile
+    container_name: web-api
+    hostname: web-api
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.90
+    ports:
+      - "5000:5000"  # HTTP
+    volumes:
+      - certs-app:/certs
+      - certs-ca:/ca-certs
+    environment:
+      - CLIENT_ID=web-api-subscriber
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=8883
+      - CERT_PATH=/certs/cert.pem
+      - KEY_PATH=/certs/privkey.pem
+      - CA_PATH=/ca-certs/ca_chain.crt
+      - LOKI_URL=http://loki:3100/loki/api/v1/push
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      certbot-app:
+        condition: service_started
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=web-api"
+
+  # Certificate Automation Service
+  cert-automation:
+    image: alpine:latest
+    container_name: cert-automation
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.110
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts:/scripts
+    command: >
+      sh -c "
+        apk add --no-cache docker-cli bash curl &&
+        echo 'Waiting for core services to be ready...' &&
+        sleep 30 &&
+        echo 'Running certificate automation...' &&
+        /scripts/ensure-certificate-automation.sh &&
+        echo 'Certificate automation complete. Keeping container alive...' &&
+        tail -f /dev/null
+      "
+    depends_on:
+      step-ca:
+        condition: service_healthy
+      certbot-mqtt:
+        condition: service_started
+      certbot-device:
+        condition: service_started
+      certbot-app:
+        condition: service_started
+    restart: unless-stopped
+
+  # React Frontend - Real-time Dashboard
+  frontend:
+    build:
+      context: ./src/Frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    hostname: frontend
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.100
+    ports:
+      - "3000:3000"  # HTTP
+      - "3001:3001"  # HTTPS
+    volumes:
+      - certs-app:/etc/nginx/certs
+    environment:
+      - REACT_APP_API_URL=http://web-api:5000
+      - REACT_APP_SIGNALR_URL=http://web-api:5000/telemetryHub
+    depends_on:
+      web-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=frontend"
+
+  # .NET Device Simulator - Blood Separator Centrifuge
+  device-simulator:
+    build:
+      context: ./src/DeviceSimulator
+      dockerfile: Dockerfile
+    container_name: device-simulator
+    hostname: device-simulator
+    networks:
+      cert-mgmt-network:
+        ipv4_address: 172.20.0.80
+    ports:
+      - "8080:8080"  # Health and metrics endpoints
+    volumes:
+      - certs-device:/certs
+      - certs-ca:/ca-certs
+    environment:
+      - DEVICE_ID=centrifuge-001
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=8883
+      - CERT_PATH=/certs/cert.pem
+      - KEY_PATH=/certs/privkey.pem
+      - CA_PATH=/ca-certs/root_ca.crt
+      - LOKI_URL=http://loki:3100/loki/api/v1/push
+      - DOTNET_ENVIRONMENT=Production
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      certbot-device:
+        condition: service_started
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=device-simulator"

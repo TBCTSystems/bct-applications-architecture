@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  step-ca:
+    extra_hosts:
+      - "device.localtest.me:172.20.0.50"
+      - "app.localtest.me:172.20.0.60"
+      - "mqtt.localtest.me:172.20.0.70"

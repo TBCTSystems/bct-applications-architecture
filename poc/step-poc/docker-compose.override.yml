@@ -1,0 +1,49 @@
+version: '3.8'
+
+# Development overrides for easier debugging and development
+services:
+  step-ca:
+    environment:
+      - STEP_CA_LOG_LEVEL=debug
+    volumes:
+      - ./logs/step-ca:/var/log/step-ca
+
+  mosquitto:
+    environment:
+      - MOSQUITTO_LOG_LEVEL=debug
+    volumes:
+      - ./logs/mosquitto:/var/log/mosquitto
+
+  grafana:
+    environment:
+      - GF_LOG_LEVEL=debug
+      - GF_SECURITY_ADMIN_PASSWORD=devpassword
+    volumes:
+      - ./config/grafana/dev:/etc/grafana/provisioning/dev
+
+  loki:
+    environment:
+      - LOKI_LOG_LEVEL=debug
+    volumes:
+      - ./logs/loki:/var/log/loki
+
+  certbot-device:
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./logs/certbot-device:/var/log/certbot
+
+  certbot-app:
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./logs/certbot-app:/var/log/certbot
+
+  certbot-mqtt:
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./logs/certbot-mqtt:/var/log/certbot

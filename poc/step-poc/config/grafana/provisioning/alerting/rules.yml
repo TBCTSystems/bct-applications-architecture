@@ -1,0 +1,43 @@
+groups:
+  - name: device_simulator_alerts
+    interval: 30s
+    rules:
+      - alert: DeviceDisconnected
+        expr: device_mqtt_connection_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: device-simulator
+        annotations:
+          summary: "Device {{ $labels.instance }} is disconnected from MQTT broker"
+          description: "Device simulator has been disconnected from MQTT broker for more than 1 minute"
+          
+      - alert: HighConnectionFailureRate
+        expr: rate(device_mqtt_connection_failures_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: device-simulator
+        annotations:
+          summary: "High connection failure rate detected"
+          description: "Device simulator is experiencing {{ $value }} connection failures per second"
+          
+      - alert: NoTelemetryMessages
+        expr: rate(device_telemetry_messages_sent_total[5m]) == 0
+        for: 3m
+        labels:
+          severity: warning
+          service: device-simulator
+        annotations:
+          summary: "No telemetry messages being sent"
+          description: "Device simulator has not sent any telemetry messages in the last 3 minutes"
+          
+      - alert: SlowTelemetryGeneration
+        expr: device_telemetry_generation_duration_ms > 1000
+        for: 1m
+        labels:
+          severity: warning
+          service: device-simulator
+        annotations:
+          summary: "Slow telemetry generation detected"
+          description: "Telemetry generation is taking {{ $value }}ms, which is above the 1000ms threshold"
