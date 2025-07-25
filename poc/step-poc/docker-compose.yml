@@ -337,8 +337,7 @@ services:
       cert-mgmt-network:
         ipv4_address: 172.20.0.100
     ports:
-      - "3000:3000"  # HTTP
-      - "3001:3001"  # HTTPS
+      - "3001:3000"  # HTTP (avoiding conflict with Grafana)
     volumes:
       - certs-app:/etc/nginx/certs
     environment:

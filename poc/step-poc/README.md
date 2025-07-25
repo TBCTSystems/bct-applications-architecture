@@ -277,55 +277,8 @@ docker system prune -f
 docker compose up -d
 ```
 
-## Documentation
-
-- [Phase 1: Infrastructure Setup](docs/phase1-acceptance-criteria.md)
-- [Phase 2: Certificate Management](docs/phase2.1-completion-report.md)
-- [Phase 3: Device Simulator](docs/phase3-completion-report.md)
-- [Phase 4: Web Application](docs/phase4-final-integration-report.md)
-- [Certificate Troubleshooting](docs/certificate-troubleshooting.md)
-- [Setup Guide](docs/setup-guide.md)
-
-## Production Considerations
-
-### Security Hardening
-- Increase certificate lifetime (24 hours → 90 days)
-- Implement proper CA certificate management
-- Add certificate revocation checking
-- Enable audit logging
-
-### Scalability
-- Replace in-memory storage with persistent database
-- Implement horizontal scaling for Web API
-- Add load balancing for MQTT broker
-- Configure certificate distribution for multiple nodes
-
-### Monitoring
-- Set up alerting rules in Grafana
-- Implement certificate expiration monitoring
-- Add performance benchmarking
-- Configure log retention policies
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## Acknowledgments
 
 - [Smallstep step-ca](https://github.com/smallstep/certificates) for the excellent ACME CA
 - [Eclipse Mosquitto](https://mosquitto.org/) for the robust MQTT broker
 - [Grafana Labs](https://grafana.com/) for the observability stack
-
----
-
-**Status**: Production Ready  
-**Last Updated**: January 27, 2025  
-**Version**: 1.0.0
