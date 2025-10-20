@@ -1,0 +1,77 @@
+# Certificate Renewal Service Configuration
+
+# Service Settings
+check_interval_minutes: 30  # Check certificates every 30 minutes
+log_level: INFO             # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_file: logs/cert_renewal.log
+cert_storage_path: certs
+
+# Renewal Threshold Settings (days before expiration)
+default_renewal_threshold_days: 30    # Default renewal threshold
+emergency_renewal_threshold_days: 7   # Emergency - force renewal regardless
+warning_threshold_days: 14            # Warning - log warnings but don't force yet
+
+# Step CA Configuration
+step_ca:
+  # Protocol: JWK (Step CA native) or EST (Enrollment over Secure Transport)
+  protocol: "JWK"  # Options: JWK, EST
+  
+  # Common settings for both protocols
+  ca_url: "https://your-step-ca-server:9000"  # For EST: use https://your-ca:8443/.well-known/est
+  ca_fingerprint: "your-ca-root-certificate-fingerprint"
+  root_cert_path: "certs/root_ca.crt"
+  
+  # JWK Provisioner settings (used when protocol = "JWK")
+  provisioner_name: "your-provisioner-name"
+  provisioner_password: null  # Optional: can use environment variable instead
+  provisioner_key_path: null  # Optional: path to provisioner private key
+  
+  # EST settings (used when protocol = "EST")
+  est_username: null          # EST HTTP Basic auth username
+  est_password: null          # EST HTTP Basic auth password
+  est_client_cert: null       # EST client certificate path (alternative to username/password)
+  est_client_key: null        # EST client private key path
+  est_ca_bundle: null         # EST CA bundle path (optional)
+  
+  # CRL (Certificate Revocation List) settings
+  crl_enabled: true           # Enable CRL checking during certificate validation
+  crl_urls:                   # Optional: Explicit CRL URLs (in addition to cert distribution points)
+    - "http://your-ca.com/crl/ca.crl"
+    # - "http://backup-ca.com/crl/ca.crl"
+  crl_cache_dir: "certs/crl"  # Directory to cache downloaded CRLs
+  crl_refresh_hours: 24       # Hours between CRL refresh (default: 24)
+  crl_timeout_seconds: 30     # Timeout for CRL downloads (default: 30)
+
+# Certificates to Monitor and Auto-Renew
+certificates:
+  - name: "web-server"
+    cert_path: "certs/web-server.crt"
+    key_path: "certs/web-server.key"
+    # renewal_threshold_days: 30  # Optional - uses default if not specified
+    subject: "web.example.com"
+    sans:
+      - "www.example.com"
+      - "api.example.com"
+  
+  - name: "api-server"
+    cert_path: "certs/api-server.crt"
+    key_path: "certs/api-server.key"
+    renewal_threshold_days: 15      # Custom threshold for this certificate
+    subject: "api.internal.com"
+    sans:
+      - "api-v2.internal.com"
+      
+  - name: "critical-service"
+    cert_path: "certs/critical-service.crt"
+    key_path: "certs/critical-service.key"
+    renewal_threshold_days: 45      # More conservative for critical services
+    subject: "critical.internal.com"
+
+# Example configuration using environment variables:
+# Environment variables can override any setting using the pattern:
+# CERT_RENEWAL_<SECTION>__<KEY>=value
+# 
+# Examples:
+# CERT_RENEWAL_STEP_CA__CA_URL="https://ca.mycompany.com:9000"
+# CERT_RENEWAL_STEP_CA__PROVISIONER_PASSWORD="secret"
+# CERT_RENEWAL_LOG_LEVEL="DEBUG"

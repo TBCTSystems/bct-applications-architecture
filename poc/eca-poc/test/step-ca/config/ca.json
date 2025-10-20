@@ -1,0 +1,48 @@
+{
+	"root": "C:\\Users\\jdavusb5\\OneDrive - Terumo BCT\\Documents\\CertRenew\\Client POC\\test\\step-ca\\certs\\root_ca.crt",
+	"federatedRoots": null,
+	"crt": "C:\\Users\\jdavusb5\\OneDrive - Terumo BCT\\Documents\\CertRenew\\Client POC\\test\\step-ca\\certs\\intermediate_ca.crt",
+	"key": "C:\\Users\\jdavusb5\\OneDrive - Terumo BCT\\Documents\\CertRenew\\Client POC\\test\\step-ca\\secrets\\intermediate_ca_key",
+	"address": ":9000",
+	"insecureAddress": "",
+	"dnsNames": [
+		"localhost",
+		"step-ca",
+		"127.0.0.1"
+	],
+	"logger": {
+		"format": "text"
+	},
+	"db": {
+		"type": "badgerv2",
+		"dataSource": "test\\step-ca\\db",
+		"badgerFileLoadingMode": ""
+	},
+	"authority": {
+		"provisioners": [
+			{
+				"type": "JWK",
+				"name": "admin",
+				"key": {
+					"use": "sig",
+					"kty": "EC",
+					"kid": "JEU4-TPWx4mXO9l_euDpg5EvoZpkZJPbrGJTnbyiuJM",
+					"crv": "P-256",
+					"alg": "ES256",
+					"x": "TYqfruhyx9IpOuwaJ5VnXP-SYIPkq2VuPI1RmrOtTYE",
+					"y": "wNtRdjYBheSZxmhZ-eKrBfhbAneBlVl3QaHqkXFbbM0"
+				},
+				"encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjYwMDAwMCwicDJzIjoidms1ek1rWkdTbUZ4My1JNXl4ZWRPQSJ9.8s16DH9ljZv1bxtYYHZsSAA7nUVq5mBPu-WyrrlzZRauGq_HFa8Gsg._mfp_JED8gS5xOdv.ELZ6qhfqYFmxL9PUNckQHYpPWYGwapSBGMm_0-73Pb9tAOaBTw4ZNS-BhV6-Gx0bl4sanZ1zPW29moB1AAp1c84mDSGYng9aMWaN87Uf5YabtlLfYVjxKZT1MZqzrTHoFfH3abmcGdKQ96OdFCGsWoORqc8kv1ysKG1R_AUCzG6tBakvzfgyKg2buBGzsSkWT44kejzEGKaVOiv3uh6JvIVus0p9wARN76tJEdZo6nBRomeDviGIIsBbA57Jo7Zuxe3Qc1y3358U0AvckJGYYAk_dZ9wnFoyuF_B670AAqGNxQcpEas1pkeRY6zoiAKMOjloGiHgXUZfTVL4Aqc.fsg5yjsj3UzkvZq41zQLNw"
+			}
+		]
+	},
+	"tls": {
+		"cipherSuites": [
+			"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+			"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+		],
+		"minVersion": 1.2,
+		"maxVersion": 1.3,
+		"renegotiation": false
+	}
+}

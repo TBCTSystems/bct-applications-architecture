@@ -1,0 +1,58 @@
+Certificate Renewal Service - Test Certificate Summary
+=======================================================
+
+Generated on: 2025-10-20 17:50:39 UTC
+
+Certificate: test-web-server
+  Subject: test-web.local
+  Description: Web server certificate (expires soon)
+  Validity: 10 days from generation
+  SANs: www.test-web.local, api.test-web.local
+  Certificate file: test-web-server.crt
+  Private key file: test-web-server.key
+
+Certificate: test-api-server
+  Subject: test-api.local
+  Description: API server certificate (medium expiration)
+  Validity: 20 days from generation
+  SANs: api-v2.test-web.local, backend.test-web.local
+  Certificate file: test-api-server.crt
+  Private key file: test-api-server.key
+
+Certificate: test-expiring-soon
+  Subject: expiring.test.local
+  Description: Certificate expiring very soon (emergency)
+  Validity: 2 days from generation
+  Certificate file: test-expiring-soon.crt
+  Private key file: test-expiring-soon.key
+
+Certificate: test-valid-long
+  Subject: valid.test.local
+  Description: Long-term valid certificate (should not renew)
+  Validity: 60 days from generation
+  SANs: valid-api.test.local, long-term.test.local
+  Certificate file: test-valid-long.crt
+  Private key file: test-valid-long.key
+
+Certificate: test-already-expired
+  Subject: expired.test.local
+  Description: Already expired certificate (needs immediate renewal)
+  Validity: -5 days from generation
+  Certificate file: test-already-expired.crt
+  Private key file: test-already-expired.key
+
+Certificate: test-client-auth
+  Subject: client.test.local
+  Description: Client authentication certificate
+  Validity: 7 days from generation
+  SANs: client-app.test.local
+  Certificate file: test-client-auth.crt
+  Private key file: test-client-auth.key
+
+Test Scenarios:
+- Certificates expiring soon (< 10 days): test-web-server, test-expiring-soon, test-client-auth
+- Emergency renewals (< 5 days): test-expiring-soon
+- Already expired: test-already-expired
+- Long-term valid: test-valid-long
+
+Use these certificates to test different renewal scenarios.

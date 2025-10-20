@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  step-ca-test:
+    image: smallstep/step-ca:latest
+    container_name: step-ca-test
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./step-ca:/home/step
+    environment:
+      - DOCKER_STEPCA_INIT_NAME=Test-CA
+      - DOCKER_STEPCA_INIT_DNS_NAMES=localhost,step-ca-test,127.0.0.1
+      - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
+      - DOCKER_STEPCA_INIT_PASSWORD=testpassword
+      - DOCKER_STEPCA_INIT_PROVISIONER_PASSWORD=adminpassword
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "step", "ca", "health", "--ca-url", "https://localhost:9000", "--root", "/home/step/certs/root_ca.crt"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  cert-renewal-test:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: cert-renewal-test
+    depends_on:
+      step-ca-test:
+        condition: service_healthy
+    volumes:
+      - ./test-config:/app/config
+      - ./client-certs:/app/certs
+      - ./logs:/app/logs
+      - ./dummy-certs:/app/test-certs:ro  # Read-only access to dummy certs
+    environment:
+      - CERT_RENEWAL_STEP_CA__CA_URL=https://step-ca-test:9000
+      - CERT_RENEWAL_STEP_CA__PROVISIONER_NAME=admin
+      - CERT_RENEWAL_STEP_CA__PROVISIONER_PASSWORD=adminpassword
+      - CERT_RENEWAL_LOG_LEVEL=DEBUG
+      - CERT_RENEWAL_CHECK_INTERVAL_MINUTES=2
+    networks:
+      - test-network
+    command: ["tail", "-f", "/dev/null"]  # Keep container running for testing
+    restart: "no"
+
+  # Optional: EST server for testing EST protocol
+  est-server-test:
+    image: smallstep/step-ca:latest
+    container_name: est-server-test
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./est-ca:/home/step
+    environment:
+      - DOCKER_STEPCA_INIT_NAME=EST-Test-CA
+      - DOCKER_STEPCA_INIT_DNS_NAMES=localhost,est-server-test,127.0.0.1
+      - DOCKER_STEPCA_INIT_ADDRESS=:8443
+      - DOCKER_STEPCA_INIT_PASSWORD=estpassword
+      - DOCKER_STEPCA_INIT_PROVISIONER_PASSWORD=estadminpassword
+    networks:
+      - test-network
+    profiles:
+      - est-testing  # Only start with --profile est-testing
+    restart: unless-stopped
+
+networks:
+  test-network:
+    driver: bridge
+    name: cert-renewal-test-network

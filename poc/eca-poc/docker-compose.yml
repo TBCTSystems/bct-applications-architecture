@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  cert-renewal-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cert-renewal-service
+    restart: unless-stopped
+    
+    # Mount configuration and certificate directories
+    volumes:
+      - ./config:/app/config:ro
+      - ./certs:/app/certs
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro  # Optional: for environment variables
+    
+    # Environment variables (can also use .env file)
+    environment:
+      - CERT_RENEWAL_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CERT_RENEWAL_CHECK_INTERVAL_MINUTES=${CHECK_INTERVAL:-30}
+      - CERT_RENEWAL_STEP_CA__CA_URL=${STEP_CA_URL}
+      - CERT_RENEWAL_STEP_CA__CA_FINGERPRINT=${STEP_CA_FINGERPRINT}
+      - CERT_RENEWAL_STEP_CA__PROVISIONER_NAME=${STEP_PROVISIONER_NAME}
+      - CERT_RENEWAL_STEP_CA__PROVISIONER_PASSWORD=${STEP_PROVISIONER_PASSWORD}
+    
+    # Network configuration (if Step CA is on a custom network)
+    # networks:
+    #   - step-ca-network
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "main.py", "status", "--format", "json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# If using custom networks
+# networks:
+#   step-ca-network:
+#     external: true

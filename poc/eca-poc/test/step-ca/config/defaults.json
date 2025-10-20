@@ -1,0 +1,6 @@
+{
+  "ca-url": "https://localhost:9000",
+  "fingerprint": "35825219b2e3d85d046cb9b8e86408b66ae7ed15b23dcc9b5ab01dd85c31f57b",
+  "root": "test\\step-ca\\certs\\root_ca.crt",
+  "redirect-url": ""
+}

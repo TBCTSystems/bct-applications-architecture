@@ -1,0 +1,56 @@
+# Example docker-compose file for development with Step CA
+version: '3.8'
+
+services:
+  # Step CA Server (for testing)
+  step-ca:
+    image: smallstep/step-ca:latest
+    container_name: step-ca-dev
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - step-ca-data:/home/step
+    environment:
+      - DOCKER_STEPCA_INIT_NAME=DevCA
+      - DOCKER_STEPCA_INIT_DNS_NAMES=localhost,step-ca,host.docker.internal
+      - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
+    networks:
+      - step-ca-network
+
+  # Certificate Renewal Service
+  cert-renewal-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cert-renewal-service-dev
+    restart: unless-stopped
+    depends_on:
+      - step-ca
+    
+    volumes:
+      - ./config:/app/config:ro
+      - ./certs:/app/certs
+      - ./logs:/app/logs
+    
+    environment:
+      - CERT_RENEWAL_LOG_LEVEL=DEBUG
+      - CERT_RENEWAL_CHECK_INTERVAL_MINUTES=5  # Check every 5 minutes for development
+      - CERT_RENEWAL_STEP_CA__CA_URL=https://step-ca:9000
+      # Note: You'll need to set these after Step CA initialization
+      - CERT_RENEWAL_STEP_CA__CA_FINGERPRINT=${STEP_CA_FINGERPRINT}
+      - CERT_RENEWAL_STEP_CA__PROVISIONER_NAME=admin
+      - CERT_RENEWAL_STEP_CA__PROVISIONER_PASSWORD=${STEP_PROVISIONER_PASSWORD}
+    
+    networks:
+      - step-ca-network
+    
+    # Override command for development (manual start)
+    command: ["tail", "-f", "/dev/null"]
+
+networks:
+  step-ca-network:
+    driver: bridge
+
+volumes:
+  step-ca-data:
