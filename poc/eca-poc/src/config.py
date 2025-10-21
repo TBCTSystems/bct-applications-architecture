@@ -13,7 +13,7 @@ class CertificateConfig(BaseModel):
     name: str = Field(..., description="Unique name for this certificate")
     cert_path: str = Field(..., description="Path to the certificate file")
     key_path: str = Field(..., description="Path to the private key file")
-    renewal_threshold_days: Optional[int] = Field(None, description="Days before expiry to trigger renewal (uses default if not specified)")
+    renewal_threshold_percent: Optional[float] = Field(None, description="Percentage of remaining lifetime to trigger renewal (0-100). Uses default if not specified.")
     subject: str = Field(..., description="Certificate subject (Common Name)")
     sans: Optional[List[str]] = Field(default=[], description="Subject Alternative Names")
 
@@ -57,10 +57,9 @@ class ServiceConfig(BaseSettings):
     # Certificate storage
     cert_storage_path: str = Field("certs", description="Directory to store certificates")
     
-    # Default renewal thresholds (can be overridden per certificate)
-    default_renewal_threshold_days: int = Field(30, description="Default days before expiry to trigger renewal")
-    emergency_renewal_threshold_days: int = Field(7, description="Emergency threshold - force renewal regardless of other factors")
-    warning_threshold_days: int = Field(14, description="Warning threshold - log warnings but don't force renewal yet")
+    # Renewal threshold based on percentage of remaining lifetime
+    # For example: 33.0 means renew when 33% or less of the certificate lifetime remains
+    renewal_threshold_percent: float = Field(33.0, description="Renew when remaining lifetime is at or below this percentage (0-100)")
     
     # Step CA configuration
     step_ca: StepCAConfig

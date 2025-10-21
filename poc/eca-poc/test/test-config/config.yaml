@@ -7,24 +7,40 @@ log_level: DEBUG
 log_file: test/logs/cert_renewal_test.log
 cert_storage_path: test/client-certs
 
-# Renewal Threshold Settings (shorter for testing)
-default_renewal_threshold_days: 5     # Short for testing (vs 30 in production)
-emergency_renewal_threshold_days: 1   # Very short for testing (vs 7 in production)  
-warning_threshold_days: 3             # Short for testing (vs 14 in production)
+# Renewal Threshold Settings
+# Percentage of remaining certificate lifetime - renew when at or below this threshold
+# Example: 33.0 means renew when 33% or less of the certificate lifetime remains
+# For a 90-day cert: 33% = ~30 days remaining
+renewal_threshold_percent: 33.0  # High threshold for testing (vs 33.0 for production)
 
-# Step CA Configuration
+# Step CA Configuration - SUPPORTS BOTH JWK AND EST
+# The same Step CA instance serves both protocols simultaneously
+# Choose protocol based on your needs:
+#   - JWK: Step CA native, requires step-cli
+#   - EST: RFC 7030 standard, pure Python, no CLI needed
+
 step_ca:
-  protocol: "JWK"  # Use JWK protocol for Step CA native integration
+  # Protocol Selection: "JWK" or "EST"
+  protocol: "JWK"  # Change to "EST" to use EST protocol
+  
+  # JWK Configuration (protocol="JWK")
   ca_url: "https://localhost:9000"
-  ca_fingerprint: "35825219b2e3d85d046cb9b8e86408b66ae7ed15b23dcc9b5ab01dd85c31f57b"
+  ca_fingerprint: "68f812ebac2e9d66c03521d6a605c93b69765fde1e8ae2201246d75210e91f62"
   provisioner_name: "admin"
   provisioner_password: "testpassword"
   root_cert_path: "test/step-ca/certs/root_ca.crt"
   
+  # EST Configuration (protocol="EST") - commented out, uncomment to use
+  # ca_url: "https://localhost:9000/.well-known/est"
+  # # or use port 8443: "https://localhost:8443/.well-known/est"
+  # est_username: "est-client"
+  # est_password: "est-secret"
+  # root_cert_path: "test/step-ca/certs/root_ca.crt"
+  
   # Bootstrap settings for automatic CA trust
   bootstrap_ca: true
   
-  # CRL settings
+  # CRL settings (same for both protocols)
   crl_enabled: true
   crl_cache_dir: "test/client-certs/crl"
   crl_refresh_hours: 1  # Refresh CRL every hour for testing
@@ -40,7 +56,7 @@ certificates:
   - name: "test-web-server"
     cert_path: "test/dummy-certs/test-web-server.crt"
     key_path: "test/dummy-certs/test-web-server.key"
-    renewal_threshold_days: 3  # Override default for this certificate
+    renewal_threshold_percent: 100.0  # Renew immediately for testing
     subject: "test-web.local"
     sans:
       - "www.test-web.local"
@@ -49,7 +65,7 @@ certificates:
   - name: "test-api-server"
     cert_path: "test/dummy-certs/test-api-server.crt"
     key_path: "test/dummy-certs/test-api-server.key"
-    renewal_threshold_days: 5  # Use service default
+    renewal_threshold_percent: 100.0  # Renew immediately for testing
     subject: "test-api.local"
     sans:
       - "api-v2.test-web.local"
@@ -58,34 +74,29 @@ certificates:
   - name: "test-expiring-soon"
     cert_path: "test/dummy-certs/test-expiring-soon.crt"
     key_path: "test/dummy-certs/test-expiring-soon.key"
-    renewal_threshold_days: 2  # Emergency renewal scenario
+    renewal_threshold_percent: 100.0  # Renew immediately for testing
     subject: "expiring.test.local"
     
   - name: "test-client-auth"
     cert_path: "test/dummy-certs/test-client-auth.crt"
     key_path: "test/dummy-certs/test-client-auth.key"
-    renewal_threshold_days: 4
+    renewal_threshold_percent: 100.0  # Renew immediately for testing
     subject: "client.test.local"
     sans:
       - "client-app.test.local"
 
-# Alternative EST Protocol Configuration (commented out)
-# Uncomment and modify to test EST protocol instead of JWK
-# step_ca:
-#   protocol: "EST"
-#   ca_url: "https://localhost:8443/.well-known/est"
-#   est_username: "testuser"
-#   est_password: "testpass"
-#   root_cert_path: "test/est-ca/certs/root_ca.crt"
-#   
-#   # EST-specific settings
-#   est_additional_headers:
-#     X-Test-Header: "testing"
-#   
-#   # CRL settings (same as JWK)
-#   crl_enabled: true
-#   crl_cache_dir: "test/client-certs/crl"
-#   crl_refresh_hours: 1
+# How to Switch Protocols:
+# 
+# To use EST instead of JWK, simply change these settings:
+#   1. Change: protocol: "EST"
+#   2. Change: ca_url: "https://localhost:9000/.well-known/est"
+#   3. Comment out: provisioner_name and provisioner_password
+#   4. Uncomment: est_username and est_password (see above)
+#
+# Both protocols work with the same Step CA instance!
+# Test both:
+#   JWK: docker exec step-ca-test step ca health
+#   EST: curl -k https://localhost:9000/.well-known/est/cacerts
 
 # Notification Settings (for testing)
 notifications:

@@ -181,13 +181,58 @@ function Start-StepCA {
                     Write-Host "⚠️  Could not retrieve CA fingerprint" -ForegroundColor Yellow
                 }
                 
+                # Add EST provisioner
                 Write-Host ""
-                Write-Host "🎯 Step CA Connection Details:" -ForegroundColor White
-                Write-Host "   URL: https://localhost:$caPort" -ForegroundColor Gray
-                Write-Host "   Provisioner: admin" -ForegroundColor Gray
-                Write-Host "   Password: adminpassword" -ForegroundColor Gray
+                Write-Host "⚙️  Adding EST provisioner..." -ForegroundColor Cyan
+                try {
+                    $addEstResult = docker exec $containerName sh -c @"
+python3 << 'EOFPYTHON'
+import json
+config_path = '/home/step/config/ca.json'
+try:
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    provisioners = config.get('authority', {}).get('provisioners', [])
+    est_exists = any(p.get('type') == 'EST' for p in provisioners)
+    if not est_exists:
+        provisioners.append({'type': 'EST', 'name': 'est-provisioner'})
+        config['authority']['provisioners'] = provisioners
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2)
+        print('EST provisioner added')
+    else:
+        print('EST provisioner exists')
+except Exception as e:
+    print(f'Error: {e}')
+EOFPYTHON
+"@
+                    if ($addEstResult -match "added|exists") {
+                        Write-Host "✅ EST provisioner configured" -ForegroundColor Green
+                    }
+                } catch {
+                    Write-Host "⚠️  Could not add EST provisioner automatically" -ForegroundColor Yellow
+                }
+                
+                Write-Host ""
+                Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor White
+                Write-Host "🎯 Step CA Connection Details (JWK + EST)" -ForegroundColor White
+                Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor White
+                Write-Host ""
+                Write-Host "Provisioners:" -ForegroundColor Cyan
+                Write-Host "  JWK (admin):           Step CA native protocol" -ForegroundColor Gray
+                Write-Host "    URL: https://localhost:$caPort" -ForegroundColor Gray
+                Write-Host "    Password: adminpassword" -ForegroundColor Gray
+                Write-Host ""
+                Write-Host "  EST (est-provisioner): RFC 7030 protocol" -ForegroundColor Gray
+                Write-Host "    URL: https://localhost:$caPort/.well-known/est/" -ForegroundColor Gray
+                Write-Host "    Also: https://localhost:8443/.well-known/est/" -ForegroundColor Gray
+                Write-Host ""
+                Write-Host "Test Commands:" -ForegroundColor Cyan
+                Write-Host "  JWK: docker exec $containerName step ca health" -ForegroundColor Gray
+                Write-Host "  EST: curl -k https://localhost:$caPort/.well-known/est/cacerts" -ForegroundColor Gray
                 Write-Host ""
                 Write-Host "✅ Step CA is ready for certificate renewal testing!" -ForegroundColor Green
+                Write-Host "   Supports both JWK and EST protocols simultaneously" -ForegroundColor Gray
                 
             } else {
                 Write-Host "⚠️  Step CA initialization may be taking longer than expected" -ForegroundColor Yellow

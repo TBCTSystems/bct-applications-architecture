@@ -6,14 +6,17 @@ services:
     container_name: step-ca-test
     ports:
       - "9000:9000"
+      - "8443:9000"  # Alias for EST on standard port (optional)
     volumes:
       - ./step-ca:/home/step
+      - ./init-step-ca.sh:/home/step/init-step-ca.sh:ro
     environment:
       - DOCKER_STEPCA_INIT_NAME=Test-CA
       - DOCKER_STEPCA_INIT_DNS_NAMES=localhost,step-ca-test,127.0.0.1
       - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
       - DOCKER_STEPCA_INIT_PASSWORD=testpassword
       - DOCKER_STEPCA_INIT_PROVISIONER_PASSWORD=adminpassword
+      - ENABLE_EST_PROVISIONER=true  # Enable EST support
     networks:
       - test-network
     healthcheck:
@@ -48,25 +51,34 @@ services:
     command: ["tail", "-f", "/dev/null"]  # Keep container running for testing
     restart: "no"
 
-  # Optional: EST server for testing EST protocol
-  est-server-test:
-    image: smallstep/step-ca:latest
-    container_name: est-server-test
-    ports:
-      - "8443:8443"
+  # Optional: Additional renewal service testing EST protocol
+  cert-renewal-est:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: cert-renewal-est
+    depends_on:
+      step-ca-test:
+        condition: service_healthy
     volumes:
-      - ./est-ca:/home/step
+      - ./test-config:/app/config
+      - ./client-certs:/app/certs-est
+      - ./logs:/app/logs
     environment:
-      - DOCKER_STEPCA_INIT_NAME=EST-Test-CA
-      - DOCKER_STEPCA_INIT_DNS_NAMES=localhost,est-server-test,127.0.0.1
-      - DOCKER_STEPCA_INIT_ADDRESS=:8443
-      - DOCKER_STEPCA_INIT_PASSWORD=estpassword
-      - DOCKER_STEPCA_INIT_PROVISIONER_PASSWORD=estadminpassword
+      # EST Configuration (using same CA, different provisioner)
+      - CERT_RENEWAL_STEP_CA__PROTOCOL=EST
+      - CERT_RENEWAL_STEP_CA__CA_URL=https://step-ca-test:9000/.well-known/est
+      - CERT_RENEWAL_STEP_CA__EST_USERNAME=est-client
+      - CERT_RENEWAL_STEP_CA__EST_PASSWORD=est-secret
+      - CERT_RENEWAL_LOG_LEVEL=DEBUG
+      - CERT_RENEWAL_CHECK_INTERVAL_MINUTES=2
+      - CERT_RENEWAL_CERT_STORAGE_PATH=certs-est
     networks:
       - test-network
+    command: ["tail", "-f", "/dev/null"]
+    restart: "no"
     profiles:
-      - est-testing  # Only start with --profile est-testing
-    restart: unless-stopped
+      - est-client  # Only start with --profile est-client
 
 networks:
   test-network:

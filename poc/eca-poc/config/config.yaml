@@ -6,10 +6,12 @@ log_level: INFO             # Logging level: DEBUG, INFO, WARNING, ERROR, CRITIC
 log_file: logs/cert_renewal.log
 cert_storage_path: certs
 
-# Renewal Threshold Settings (days before expiration)
-default_renewal_threshold_days: 30    # Default renewal threshold
-emergency_renewal_threshold_days: 7   # Emergency - force renewal regardless
-warning_threshold_days: 14            # Warning - log warnings but don't force yet
+# Renewal Threshold Settings
+# Percentage of remaining certificate lifetime - renew when at or below this threshold
+# Example: 33.0 means renew when 33% or less of the certificate lifetime remains
+# For a 90-day cert: 33% = ~30 days remaining
+# For a 365-day cert: 33% = ~120 days remaining
+renewal_threshold_percent: 33.0  # Renew when 33% or less of lifetime remains
 
 # Step CA Configuration
 step_ca:
@@ -47,7 +49,7 @@ certificates:
   - name: "web-server"
     cert_path: "certs/web-server.crt"
     key_path: "certs/web-server.key"
-    # renewal_threshold_days: 30  # Optional - uses default if not specified
+    # renewal_threshold_percent: 33.0  # Optional - uses default if not specified
     subject: "web.example.com"
     sans:
       - "www.example.com"
@@ -56,7 +58,7 @@ certificates:
   - name: "api-server"
     cert_path: "certs/api-server.crt"
     key_path: "certs/api-server.key"
-    renewal_threshold_days: 15      # Custom threshold for this certificate
+    renewal_threshold_percent: 50.0  # More aggressive renewal
     subject: "api.internal.com"
     sans:
       - "api-v2.internal.com"
@@ -64,7 +66,7 @@ certificates:
   - name: "critical-service"
     cert_path: "certs/critical-service.crt"
     key_path: "certs/critical-service.key"
-    renewal_threshold_days: 45      # More conservative for critical services
+    renewal_threshold_percent: 25.0  # More conservative - renew earlier (at 75% lifetime used)
     subject: "critical.internal.com"
 
 # Example configuration using environment variables:

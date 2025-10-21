@@ -22,7 +22,8 @@ class CertificateStatus:
     expires_at: Optional[datetime]
     days_until_expiry: Optional[int]
     needs_renewal: bool
-    renewal_threshold_days: int = 30
+    renewal_threshold_percent: float = 33.0
+    remaining_lifetime_percent: float = 0.0
     renewal_reason: str = "valid"
     is_revoked: bool = False
     revocation_info: Optional[RevocationStatus] = None
@@ -72,46 +73,77 @@ class CertificateMonitor:
             return None
     
     def check_certificate_expiry(self, certificate: x509.Certificate, 
-                               renewal_threshold_days: int) -> Tuple[datetime, int, bool, str]:
-        """Check if certificate needs renewal based on expiry date."""
+                               renewal_threshold_percent: float) -> Tuple[datetime, int, bool, str, float]:
+        """
+        Check if certificate needs renewal based on remaining lifetime percentage.
+        
+        Args:
+            certificate: The X.509 certificate to check
+            renewal_threshold_percent: Percentage threshold (0-100) of remaining lifetime
+            
+        Returns:
+            Tuple of (expires_at, days_until_expiry, needs_renewal, renewal_reason, remaining_lifetime_percent)
+        """
         expires_at = certificate.not_valid_after
-        # Make expires_at timezone-aware if it's naive (assume UTC)
+        not_before = certificate.not_valid_before
+        
+        # Make dates timezone-aware if they're naive (assume UTC)
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not_before.tzinfo is None:
+            not_before = not_before.replace(tzinfo=timezone.utc)
         
         now = datetime.now(timezone.utc)
         
-        days_until_expiry = (expires_at - now).days
-        needs_renewal = days_until_expiry <= renewal_threshold_days
+        # Calculate time periods in seconds for more precision
+        time_until_expiry = expires_at - now
+        total_lifetime = expires_at - not_before
         
-        # Determine renewal urgency
-        if self.service_config:
-            emergency_threshold = getattr(self.service_config, 'emergency_renewal_threshold_days', 7)
-            warning_threshold = getattr(self.service_config, 'warning_threshold_days', 14)
-            
-            if days_until_expiry <= emergency_threshold:
-                renewal_reason = "emergency"
-            elif days_until_expiry <= warning_threshold:
-                renewal_reason = "warning" if needs_renewal else "approaching"
-            else:
-                renewal_reason = "normal" if needs_renewal else "valid"
+        # Convert to total seconds
+        seconds_remaining = time_until_expiry.total_seconds()
+        total_lifetime_seconds = total_lifetime.total_seconds()
+        
+        # Calculate days for display purposes
+        days_until_expiry = int(seconds_remaining / 86400)  # 86400 seconds in a day
+        
+        # Calculate remaining lifetime as percentage using seconds
+        if total_lifetime_seconds > 0:
+            remaining_lifetime_percent = (seconds_remaining / total_lifetime_seconds) * 100
         else:
-            renewal_reason = "normal" if needs_renewal else "valid"
+            remaining_lifetime_percent = 0.0
         
-        return expires_at, days_until_expiry, needs_renewal, renewal_reason
+        # Determine if renewal is needed based on percentage threshold
+        needs_renewal = remaining_lifetime_percent <= renewal_threshold_percent
+        
+        # Determine renewal urgency based on percentage remaining
+        if remaining_lifetime_percent <= 0:
+            renewal_reason = "expired"
+        elif remaining_lifetime_percent <= 10:
+            renewal_reason = "emergency"
+        elif remaining_lifetime_percent <= renewal_threshold_percent:
+            renewal_reason = "normal"
+        else:
+            renewal_reason = "valid"
+        
+        return expires_at, days_until_expiry, needs_renewal, renewal_reason, remaining_lifetime_percent
     
-    def get_effective_renewal_threshold(self, cert_config: CertificateConfig) -> int:
-        """Get the effective renewal threshold for a certificate."""
+    def get_effective_renewal_threshold(self, cert_config: CertificateConfig) -> float:
+        """
+        Get the effective renewal threshold percentage for a certificate.
+        
+        Returns:
+            Percentage threshold (0-100) of remaining lifetime
+        """
         # Use certificate-specific threshold if provided
-        if cert_config.renewal_threshold_days is not None:
-            return cert_config.renewal_threshold_days
+        if cert_config.renewal_threshold_percent is not None:
+            return cert_config.renewal_threshold_percent
         
         # Use service default if available
-        if self.service_config and hasattr(self.service_config, 'default_renewal_threshold_days'):
-            return self.service_config.default_renewal_threshold_days
+        if self.service_config and hasattr(self.service_config, 'renewal_threshold_percent'):
+            return self.service_config.renewal_threshold_percent
         
-        # Fallback to hardcoded default
-        return 30
+        # Fallback to hardcoded default (33% of remaining lifetime)
+        return 33.0
     
     def get_certificate_subject(self, certificate: x509.Certificate) -> str:
         """Extract the subject (Common Name) from certificate."""
@@ -161,17 +193,18 @@ class CertificateMonitor:
                 expires_at=None,
                 days_until_expiry=None,
                 needs_renewal=True,
-                renewal_threshold_days=self.get_effective_renewal_threshold(cert_config),
+                renewal_threshold_percent=self.get_effective_renewal_threshold(cert_config),
+                remaining_lifetime_percent=0.0,
                 renewal_reason="error",
                 error_message="Failed to load certificate"
             )
         
         # Check expiry
         try:
-            # Get effective renewal threshold
+            # Get effective renewal threshold percentage
             renewal_threshold = self.get_effective_renewal_threshold(cert_config)
             
-            expires_at, days_until_expiry, needs_renewal, renewal_reason = self.check_certificate_expiry(
+            expires_at, days_until_expiry, needs_renewal, renewal_reason, remaining_lifetime_percent = self.check_certificate_expiry(
                 certificate, renewal_threshold
             )
             
@@ -216,7 +249,8 @@ class CertificateMonitor:
                 expires_at=expires_at,
                 days_until_expiry=days_until_expiry,
                 needs_renewal=needs_renewal,
-                renewal_threshold_days=renewal_threshold,
+                renewal_threshold_percent=renewal_threshold,
+                remaining_lifetime_percent=remaining_lifetime_percent,
                 renewal_reason=renewal_reason,
                 is_revoked=is_revoked,
                 revocation_info=revocation_info
@@ -231,17 +265,12 @@ class CertificateMonitor:
                 urgency = "EMERGENCY" if renewal_reason == "emergency" else "NORMAL"
                 self.logger.warning(
                     f"Certificate '{cert_config.name}' needs {urgency} renewal "
-                    f"(expires in {days_until_expiry} days, threshold: {renewal_threshold} days)"
-                )
-            elif renewal_reason == "approaching":
-                self.logger.info(
-                    f"Certificate '{cert_config.name}' is approaching renewal threshold "
-                    f"(expires in {days_until_expiry} days, threshold: {renewal_threshold} days)"
+                    f"({remaining_lifetime_percent:.1f}% remaining, threshold: {renewal_threshold:.1f}%)"
                 )
             else:
                 self.logger.info(
                     f"Certificate '{cert_config.name}' is valid "
-                    f"(expires in {days_until_expiry} days, threshold: {renewal_threshold} days)"
+                    f"({remaining_lifetime_percent:.1f}% remaining, threshold: {renewal_threshold:.1f}%)"
                 )
             
             return status
@@ -257,7 +286,8 @@ class CertificateMonitor:
                 expires_at=None,
                 days_until_expiry=None,
                 needs_renewal=True,
-                renewal_threshold_days=self.get_effective_renewal_threshold(cert_config),
+                renewal_threshold_percent=self.get_effective_renewal_threshold(cert_config),
+                remaining_lifetime_percent=0.0,
                 renewal_reason="error",
                 error_message=error_msg
             )
