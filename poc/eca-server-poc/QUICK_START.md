@@ -29,7 +29,7 @@ docker-compose logs step-ca
 - **Ports**: 9443 (API), 8080 (HTTP), 8443 (HTTPS)
 - **Admin Password**: Found in logs on first run
 
-## Step 2: Configure Cloudflare (One-Time Setup)
+## Step 2: Configure Cloudflare (This One-Time Setup has completed. Please skip this step and go to Step 3.)
 
 ### Get Your Credentials
 
@@ -76,6 +76,7 @@ Run PowerShell as **Administrator**:
 
 ```powershell
 # Add hosts file entry so localca.example.com resolves to localhost
+# localca.example.com is the hostname for your local Step CA instance running on port 9443
 Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "`n127.0.0.1 localca.example.com"
 ```
 
