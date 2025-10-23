@@ -1,0 +1,18 @@
+services:
+  step-ca:
+    image: smallstep/step-ca:latest
+    container_name: step-ca
+    ports:
+      - "9443:9000"    # Step CA Admin/API (using 9443 to avoid conflict)
+      - "8080:80"      # HTTP-01 challenge (using 8080 to avoid admin rights)
+      - "8443:443"     # HTTPS (optional)
+    volumes:
+      - ./stepca/step:/home/step
+    environment:
+      - DOCKER_STEPCA_INIT_NAME=Local CA
+      - DOCKER_STEPCA_INIT_DNS_NAMES=localhost,step-ca,localca.example.com
+      - DOCKER_STEPCA_INIT_ACME=true
+      - DOCKER_STEPCA_INIT_ADDRESS=:9000
+    extra_hosts:
+      - "localca.example.com:host-gateway"
+    restart: unless-stopped
