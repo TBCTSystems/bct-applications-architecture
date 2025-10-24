@@ -185,16 +185,20 @@ class StepCAClient {
             
             $this.Logger.Debug("Running step command: $($this.StepCLI) $($args -join ' ')")
             
-            $token = & $this.StepCLI @args 2>&1
+            $output = & $this.StepCLI @args 2>&1
             
             # Clean up password file
             Remove-Item $tempPasswordFile -ErrorAction SilentlyContinue
+            
+            # Filter output to get only the token (string), not error records (stderr messages)
+            $token = $output | Where-Object { $_ -is [string] } | Select-Object -First 1
             
             if ($LASTEXITCODE -eq 0 -and $token) {
                 $this.Logger.Debug("Successfully obtained provisioner token")
                 return $token
             } else {
-                $this.Logger.Error("Failed to get provisioner token: $token")
+                $errorMsg = $output | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | Select-Object -First 1
+                $this.Logger.Error("Failed to get provisioner token: $errorMsg")
                 return $null
             }
         }

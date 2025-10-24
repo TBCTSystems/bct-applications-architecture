@@ -207,7 +207,7 @@ class CRLManager {
             $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($CertPath)
             $serialNumber = $cert.SerialNumber
             
-            $this.Logger.Debug("Checking certificate revocation against $($CRLUrls.Count) CRL sources")
+            $this.Logger.Debug("Checking certificate serial $serialNumber against $($CRLUrls.Count) CRL sources")
             
             foreach ($crlUrl in $CRLUrls) {
                 $crlData = $this.RefreshCRL($crlUrl)
@@ -245,12 +245,16 @@ class CRLManager {
             
             # Try to use step CLI to inspect CRL
             if (Get-Command step -ErrorAction SilentlyContinue) {
-                $crlInfo = & step crl inspect $tempCrlFile --format json 2>$null | ConvertFrom-Json
+                $crlInfo = & step crl inspect $tempCrlFile --insecure --format json 2>$null | ConvertFrom-Json
                 Remove-Item $tempCrlFile -ErrorAction SilentlyContinue
                 
                 if ($crlInfo.revoked_certificates) {
+                    # Convert .NET hex serial number to decimal for comparison
+                    # .NET gives hex like "00F3CB89..." but step CLI gives decimal
+                    $serialDecimal = [System.Numerics.BigInteger]::Parse($SerialNumber, [System.Globalization.NumberStyles]::HexNumber).ToString()
+                    
                     foreach ($revokedCert in $crlInfo.revoked_certificates) {
-                        if ($revokedCert.serial_number -eq $SerialNumber) {
+                        if ($revokedCert.serial_number -eq $serialDecimal) {
                             return $true
                         }
                     }
