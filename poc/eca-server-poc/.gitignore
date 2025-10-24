@@ -1,0 +1,11 @@
+# Step CA files
+stepca/step/
+
+# .NET build outputs
+bin/
+obj/
+*.user
+*.suo
+
+# Visual Studio
+.vs/
