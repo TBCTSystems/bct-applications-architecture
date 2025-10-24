@@ -100,38 +100,8 @@ certificates:
 #   JWK: docker exec step-ca-test step ca health
 #   EST: curl -k https://localhost:9000/.well-known/est/cacerts
 
-# Notification Settings (for testing)
-notifications:
-  enabled: false  # Disable for testing
-  # email:
-  #   smtp_server: "localhost"
-  #   smtp_port: 587
-  #   from_address: "cert-renewal@test.local"
-  #   to_addresses:
-  #     - "admin@test.local"
-
 # Health Check Settings
 health_check:
   enabled: true
   port: 8080
   endpoint: "/health"
-
-# Metrics Settings (optional)
-metrics:
-  enabled: false  # Disable for testing
-  # prometheus:
-  #   enabled: true
-  #   port: 9090
-  #   path: "/metrics"
-
-# Testing-specific settings
-testing:
-  # Allow expired certificates for testing scenarios
-  allow_expired_certificates: true
-  
-  # Skip actual renewal for dry-run testing
-  dry_run_mode: false
-  
-  # Generate test reports
-  generate_test_reports: true
-  test_report_path: "test/logs/test_reports"
