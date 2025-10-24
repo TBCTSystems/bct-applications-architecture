@@ -2,6 +2,10 @@
 
 A robust, production-ready service that automatically monitors and renews certificates using [Step CA](https://smallstep.com/docs/step-ca/). This proof of concept demonstrates automated certificate lifecycle management with configurable renewal thresholds, comprehensive logging, and Docker deployment.
 
+**Available in Two Implementations:**
+- **Python Version** - Production-ready service (main implementation)
+- **PowerShell Version** - Windows-native alternative (see `ps-scripts/POWERSHELL-README.md`)
+
 ## Features
 
 - 🔄 **Automatic Certificate Renewal** - Monitors certificate expiration and renews before expiry
