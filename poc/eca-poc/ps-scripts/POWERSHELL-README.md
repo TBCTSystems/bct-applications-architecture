@@ -2,16 +2,6 @@
 
 A PowerShell-based implementation of the certificate renewal service for Step CA, providing automated certificate lifecycle management with CRL (Certificate Revocation List) support.
 
-## Overview
-
-This is a **PowerShell port** of the Python-based certificate renewal proof of concept. It provides the same core functionality:
-
-- **Automatic certificate monitoring and renewal** using percentage-based thresholds
-- **CRL (Certificate Revocation List) support** with automatic downloading and caching
-- **Step CA integration** using the step CLI tool
-- **Flexible configuration** via YAML files
-- **Structured logging** with file and console output
-
 ## Requirements
 
 ### Software Requirements
