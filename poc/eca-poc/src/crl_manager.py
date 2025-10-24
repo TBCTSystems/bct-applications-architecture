@@ -51,7 +51,20 @@ class CRLManager:
         self.config = step_config
         self.logger = logger
         self.session = requests.Session()
-        self.session.timeout = self.config.crl_timeout_seconds
+        
+        # Configure SSL verification for Step CA
+        # Use the root CA certificate if available, otherwise disable verification for localhost
+        if hasattr(step_config, 'root_cert_path') and step_config.root_cert_path and os.path.exists(step_config.root_cert_path):
+            self.session.verify = step_config.root_cert_path
+            self.logger.debug(f"Using root CA certificate for CRL verification: {step_config.root_cert_path}")
+        else:
+            # Disable SSL verification for localhost/development
+            # In production, proper CA certificates should be used
+            self.session.verify = False
+            self.logger.warning("SSL verification disabled for CRL downloads - use proper CA certificates in production")
+            # Suppress InsecureRequestWarning
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
         # Create CRL cache directory
         os.makedirs(self.config.crl_cache_dir, exist_ok=True)
@@ -59,6 +72,9 @@ class CRLManager:
         # Cache for parsed CRLs
         self._crl_cache: Dict[str, x509.CertificateRevocationList] = {}
         self._crl_info_cache: Dict[str, CRLInfo] = {}
+        # Track last download time to avoid redundant downloads in the same session
+        self._last_download_time: Dict[str, datetime] = {}
+
     
     def _get_crl_file_path(self, crl_url: str) -> str:
         """Generate a file path for caching a CRL."""
@@ -101,7 +117,11 @@ class CRLManager:
                 'Accept': 'application/pkix-crl'
             }
             
-            response = self.session.get(crl_url, headers=headers)
+            response = self.session.get(
+                crl_url, 
+                headers=headers,
+                timeout=self.config.crl_timeout_seconds
+            )
             response.raise_for_status()
             
             if response.content:
@@ -168,9 +188,9 @@ class CRLManager:
             # Get issuer
             issuer = crl.issuer.rfc4514_string()
             
-            # Get update times
-            last_update = crl.last_update
-            next_update = crl.next_update
+            # Get update times (using UTC-aware properties)
+            last_update = crl.last_update_utc
+            next_update = crl.next_update_utc
             
             # Count revoked certificates
             revoked_count = len(list(crl))
@@ -206,28 +226,45 @@ class CRLManager:
             )
     
     def refresh_crl(self, crl_url: str) -> Optional[x509.CertificateRevocationList]:
-        """Refresh a CRL from URL and cache it."""
+        """Refresh a CRL from URL and cache it. Always tries to download the latest CRL first,
+        but uses in-memory cache for a short time (60 seconds) to avoid redundant downloads
+        when checking multiple certificates in the same cycle."""
         file_path = self._get_crl_file_path(crl_url)
         
-        # Check if refresh is needed
-        if not self._should_refresh_crl(crl_url, file_path):
-            # Load from cache
+        # Check if we recently downloaded this CRL (within last 60 seconds)
+        now = datetime.now(timezone.utc)
+        if crl_url in self._last_download_time:
+            time_since_download = (now - self._last_download_time[crl_url]).total_seconds()
+            if time_since_download < 60:  # Use in-memory cache for 60 seconds
+                if crl_url in self._crl_cache:
+                    self.logger.debug(f"Using recently downloaded CRL for {crl_url} (downloaded {time_since_download:.0f}s ago)")
+                    return self._crl_cache[crl_url]
+        
+        # Try to download the latest CRL to ensure we have up-to-date revocation information
+        self.logger.debug(f"Attempting to download latest CRL from {crl_url}")
+        crl_data = self.download_crl(crl_url)
+        
+        if not crl_data:
+            # Fallback to cached version if download fails
+            self.logger.warning(f"CRL download failed, trying cached version for {crl_url}")
+            
+            # Try in-memory cache first
             if crl_url in self._crl_cache:
-                self.logger.debug(f"Using cached CRL for {crl_url}")
+                self.logger.info(f"Using in-memory cached CRL for {crl_url}")
                 return self._crl_cache[crl_url]
             
-            # Load from file
+            # Try loading from cached file
             crl = self.load_crl_from_file(file_path)
             if crl:
+                self.logger.info(f"Loaded CRL from cached file for {crl_url}")
                 self._crl_cache[crl_url] = crl
                 return crl
+            
+            self.logger.error(f"No cached CRL available for {crl_url}")
+            return None
         
-        # Download fresh CRL
-        crl_data = self.download_crl(crl_url)
-        if not crl_data:
-            # Fallback to cached file if download fails
-            self.logger.warning(f"CRL download failed, trying cached version for {crl_url}")
-            return self.load_crl_from_file(file_path)
+        # Successfully downloaded CRL - update download time
+        self._last_download_time[crl_url] = now
         
         # Save to file
         if not self.save_crl_to_file(crl_data, file_path):
@@ -251,6 +288,13 @@ class CRLManager:
             
         except ValueError as e:
             self.logger.error(f"Failed to parse downloaded CRL from {crl_url}: {str(e)}")
+            # Try to fall back to cached version if parsing fails
+            self.logger.warning(f"Attempting to use cached CRL after parse failure")
+            crl = self.load_crl_from_file(file_path)
+            if crl:
+                self.logger.info(f"Using cached CRL after download parse failure")
+                self._crl_cache[crl_url] = crl
+                return crl
             return None
     
     def get_certificate_distribution_points(self, certificate: x509.Certificate) -> List[str]:
@@ -313,8 +357,8 @@ class CRLManager:
                 
                 for revoked_cert in crl:
                     if revoked_cert.serial_number == cert_serial:
-                        # Certificate is revoked
-                        revocation_date = revoked_cert.revocation_date
+                        # Certificate is revoked (using UTC-aware property)
+                        revocation_date = revoked_cert.revocation_date_utc
                         
                         # Try to get revocation reason
                         revocation_reason = "Unspecified"

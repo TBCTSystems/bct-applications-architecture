@@ -25,7 +25,7 @@ step_ca:
   
   # JWK Configuration (protocol="JWK")
   ca_url: "https://localhost:9000"
-  ca_fingerprint: "68f812ebac2e9d66c03521d6a605c93b69765fde1e8ae2201246d75210e91f62"
+  ca_fingerprint: "f4b3fd821253ae5823b5de4ec4b8dbf09f0b4e753f14eb4c447b2a93445effc9"
   provisioner_name: "admin"
   provisioner_password: "testpassword"
   root_cert_path: "test/step-ca/certs/root_ca.crt"
@@ -42,6 +42,8 @@ step_ca:
   
   # CRL settings (same for both protocols)
   crl_enabled: true
+  crl_urls:
+    - "https://localhost:9000/crl"
   crl_cache_dir: "test/client-certs/crl"
   crl_refresh_hours: 1  # Refresh CRL every hour for testing
   
@@ -56,7 +58,7 @@ certificates:
   - name: "test-web-server"
     cert_path: "test/dummy-certs/test-web-server.crt"
     key_path: "test/dummy-certs/test-web-server.key"
-    renewal_threshold_percent: 100.0  # Renew immediately for testing
+    renewal_threshold_percent: 33.0
     subject: "test-web.local"
     sans:
       - "www.test-web.local"
@@ -65,7 +67,7 @@ certificates:
   - name: "test-api-server"
     cert_path: "test/dummy-certs/test-api-server.crt"
     key_path: "test/dummy-certs/test-api-server.key"
-    renewal_threshold_percent: 100.0  # Renew immediately for testing
+    renewal_threshold_percent: 33.0
     subject: "test-api.local"
     sans:
       - "api-v2.test-web.local"
@@ -74,13 +76,13 @@ certificates:
   - name: "test-expiring-soon"
     cert_path: "test/dummy-certs/test-expiring-soon.crt"
     key_path: "test/dummy-certs/test-expiring-soon.key"
-    renewal_threshold_percent: 100.0  # Renew immediately for testing
+    renewal_threshold_percent: 99.9
     subject: "expiring.test.local"
     
   - name: "test-client-auth"
     cert_path: "test/dummy-certs/test-client-auth.crt"
     key_path: "test/dummy-certs/test-client-auth.key"
-    renewal_threshold_percent: 100.0  # Renew immediately for testing
+    renewal_threshold_percent: 33.0
     subject: "client.test.local"
     sans:
       - "client-app.test.local"

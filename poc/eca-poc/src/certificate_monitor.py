@@ -120,7 +120,7 @@ class CertificateMonitor:
             renewal_reason = "expired"
         elif remaining_lifetime_percent <= 10:
             renewal_reason = "emergency"
-        elif remaining_lifetime_percent <= renewal_threshold_percent:
+        elif remaining_lifetime_percent < renewal_threshold_percent:
             renewal_reason = "normal"
         else:
             renewal_reason = "valid"
