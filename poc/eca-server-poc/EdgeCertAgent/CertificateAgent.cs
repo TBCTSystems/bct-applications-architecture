@@ -74,9 +74,20 @@ public sealed class CertificateAgent
         Console.WriteLine($"Initialising ACME client for {_settings.StepCaUrl}");
         Console.WriteLine("Challenge type: DNS-01");
 
-        var accountKey = KeyFactory.NewKey(KeyAlgorithm.ES256);
-        await File.WriteAllTextAsync(_accountKeyPath, accountKey.ToPem());
-        Console.WriteLine($"Account key saved to {_accountKeyPath}");
+        IKey accountKey;
+        if (File.Exists(_accountKeyPath))
+        {
+            Console.WriteLine($"Using existing account key: {_accountKeyPath}");
+            var existingKeyPem = await File.ReadAllTextAsync(_accountKeyPath);
+            accountKey = KeyFactory.FromPem(existingKeyPem);
+        }
+        else
+        {
+            Console.WriteLine("Creating new ACME account key...");
+            accountKey = KeyFactory.NewKey(KeyAlgorithm.ES256);
+            await File.WriteAllTextAsync(_accountKeyPath, accountKey.ToPem());
+            Console.WriteLine($"Account key saved to {_accountKeyPath}");
+        }
 
         if (_settings.Insecure)
         {
