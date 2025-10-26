@@ -2,7 +2,7 @@
 # File: AcmeHelper.Tests.ps1
 # Requires: Pester 5.x
 
-using module  "./AcmeHelper.psm1"
+using module  "./AcmeHelperClasses.psm1"
 
 
 Describe 'AcmeHelper' {
@@ -24,7 +24,7 @@ Describe 'AcmeHelper' {
         $result.IsSuccessful | Should -Be $true
     }
 
-    It 'throws exception with expected message when Execute fails' {
+    It 'throws exception with expected message when ExecuteCall fails' {
         $errorMessage = "Some error occurred"
         # Create a mock AcmeClient and define its method behavior
         $acmeClient = New-MockObject -Type ([AcmeClient]) -Methods @{
