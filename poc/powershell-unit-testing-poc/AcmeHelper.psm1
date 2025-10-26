@@ -1,8 +1,5 @@
 
 
-#. "$PSScriptRoot/AcmeClient.ps1"
-
-
 class AcmeResponse {
     [bool] $IsSuccessful = $false;
     [string] $Error = ""
@@ -29,3 +26,6 @@ class AcmeHelper {
         return $this.AcmeClient.SendRequest();
     }
 }
+
+Export-ModuleMember -Variable * -Function * -Alias *
+
