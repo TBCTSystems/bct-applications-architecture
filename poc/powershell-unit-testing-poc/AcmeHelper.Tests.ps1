@@ -1,5 +1,4 @@
 # Import-Module Pester
-
 # File: AcmeHelper.Tests.ps1
 # Requires: Pester 5.x
 
@@ -8,8 +7,9 @@ using module  "./AcmeHelper.psm1"
 
 Describe 'AcmeHelper' {
 
+
     It 'returns success' {
-        # Create a fake AcmeClient and define its method behavior
+        # Create a mock AcmeClient and define its method behavior
         $acmeClient = New-MockObject -Type ([AcmeClient]) -Methods @{
             SendRequest = { 
                 $response = [AcmeResponse]::new() 
@@ -24,9 +24,9 @@ Describe 'AcmeHelper' {
         $result.IsSuccessful | Should -Be $true
     }
 
-    It 'returns failure' {
+    It 'throws exception with expected message when Execute fails' {
         $errorMessage = "Some error occurred"
-        # Create a fake AcmeClient and define its method behavior
+        # Create a mock AcmeClient and define its method behavior
         $acmeClient = New-MockObject -Type ([AcmeClient]) -Methods @{
             SendRequest = { 
                 $response = [AcmeResponse]::new();
@@ -37,10 +37,6 @@ Describe 'AcmeHelper' {
         }
 
         $sut = [AcmeHelper]::new($acmeClient)
-        $result = $sut.ExecuteCall() 
-        $result.IsSuccessful | Should -Be $false
-        $result.Error | Should -Be $errorMessage
+        { $sut.ExecuteCall() } | Should -Throw -ExpectedMessage "ExecuteCall failed with error: $errorMessage"
     }
-
-
 }

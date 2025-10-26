@@ -23,7 +23,12 @@ class AcmeHelper {
     }
 
     [AcmeResponse] ExecuteCall() {
-        return $this.AcmeClient.SendRequest();
+        $response = $this.AcmeClient.SendRequest();
+        if ($response.IsSuccessful) {
+            return $response
+        } else {
+            throw "ExecuteCall failed with error: $($response.Error)"
+        }
     }
 }
 
