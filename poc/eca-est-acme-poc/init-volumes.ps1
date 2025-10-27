@@ -406,6 +406,7 @@ function Copy-EstCertificatesToOpenXpki {
             chmod 644 /config/ca/${script:OpenXpkiRealm}/${script:OpenXpkiCaName}.crt && \
             cp /config/local/secrets/est-ca.key /config/local/keys/${script:OpenXpkiRealm}/${script:OpenXpkiCaName}.pem && \
             chmod 600 /config/local/keys/${script:OpenXpkiRealm}/${script:OpenXpkiCaName}.pem && \
+            chown -R 1000:1000 /config/local/keys/${script:OpenXpkiRealm} && \
             cp /config/local/secrets/root-ca.crt /config/ca/${script:OpenXpkiRealm}/root.crt && \
             chmod 644 /config/ca/${script:OpenXpkiRealm}/root.crt
         " | Out-Null
@@ -428,7 +429,6 @@ function Provision-OpenXpkiWebTls {
             --root /home/step/certs/root_ca.crt \
             --san openxpki-web \
             --san localhost \
-            --bundle \
             --force
     " | Out-Null
 
@@ -439,11 +439,12 @@ function Provision-OpenXpkiWebTls {
         sh -c "
             set -e
             mkdir -p /config/tls/private /config/tls/endentity /config/tls/chain && \
-            cp /pki/tmp/openxpki-web.crt /config/tls/endentity/openxpki.crt && \
+            cat /pki/tmp/openxpki-web.crt /pki/certs/intermediate_ca.crt > /config/tls/endentity/openxpki.crt && \
             cp /pki/tmp/openxpki-web.key /config/tls/private/openxpki.pem && \
+            cp /pki/certs/intermediate_ca.crt /config/tls/chain/intermediate-ca.crt && \
             cp /pki/certs/root_ca.crt /config/tls/chain/root-ca.crt && \
             chmod 600 /config/tls/private/openxpki.pem && \
-            chmod 644 /config/tls/endentity/openxpki.crt /config/tls/chain/root-ca.crt
+            chmod 644 /config/tls/endentity/openxpki.crt /config/tls/chain/root-ca.crt /config/tls/chain/intermediate-ca.crt
         " | Out-Null
 
     & docker exec eca-pki rm -f /home/step/tmp/openxpki-web.crt /home/step/tmp/openxpki-web.key | Out-Null
@@ -489,19 +490,19 @@ function Import-CertificatesIntoOpenXpki {
 
     Write-Info "Importing EST CA certificate into OpenXPKI..."
     try {
+        & docker exec -u root eca-openxpki-server sh -c "cp /etc/openxpki/local/secrets/est-ca.key /tmp/est-ca.key && chown openxpki:openxpki /tmp/est-ca.key && chmod 600 /tmp/est-ca.key" | Out-Null
         & docker exec eca-openxpki-server openxpkiadm alias `
             --realm $script:OpenXpkiRealm `
             --token certsign `
             --file /etc/openxpki/local/secrets/est-ca.crt `
-            --key /etc/openxpki/local/secrets/est-ca.key | Out-Null
+            --key /tmp/est-ca.key | Out-Null
     }
     catch {
         Write-Warn "Alias creation failed; copying key manually."
-        & docker exec -u root eca-openxpki-server cp `
-            /etc/openxpki/local/secrets/est-ca.key `
-            /etc/openxpki/local/keys/$($script:OpenXpkiRealm)/ca-signer-1.pem | Out-Null
-        & docker exec -u root eca-openxpki-server chmod 600 `
-            /etc/openxpki/local/keys/$($script:OpenXpkiRealm)/ca-signer-1.pem | Out-Null
+        & docker exec -u root eca-openxpki-server sh -c "cp /etc/openxpki/local/secrets/est-ca.key /etc/openxpki/local/keys/$($script:OpenXpkiRealm)/ca-signer-1.pem && chown openxpki:openxpki /etc/openxpki/local/keys/$($script:OpenXpkiRealm)/ca-signer-1.pem && chmod 600 /etc/openxpki/local/keys/$($script:OpenXpkiRealm)/ca-signer-1.pem" | Out-Null
+    }
+    finally {
+        & docker exec eca-openxpki-server rm -f /tmp/est-ca.key | Out-Null
     }
 
     Write-Info "Generating bootstrap certificate for EST agents..."
@@ -513,9 +514,12 @@ function Import-CertificatesIntoOpenXpki {
             --provisioner-password-file /home/step/secrets/password \
             --ca-url https://localhost:9000 \
             --root /home/step/certs/root_ca.crt \
+            --not-before 1m \
             --not-after 23h \
             --san bootstrap-client \
             --force" | Out-Null
+
+    Start-Sleep -Seconds 5
 
     Write-Info "Importing bootstrap certificate into OpenXPKI realm..."
     & docker exec eca-openxpki-server sh -c "
@@ -587,24 +591,21 @@ function Invoke-Main {
     Initialize-OpenXpkiDatabase
     Import-CertificatesIntoOpenXpki
 
-    Write-Section "✓ Infrastructure Initialization Complete!"
-    Write-Host ""
-    Write-Host "Next steps:"
-    Write-Host ""
-    Write-Host "1. Start all services:"
-    Write-Host "   docker compose up -d" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "2. Verify PKI is running:"
+    Write-Section "🎉 Infrastructure Initialization Complete!"
+    Write-Host "Next steps:" -ForegroundColor Cyan
+    Write-Host "  1. Start all services:" -NoNewline
+    Write-Host "  docker compose up -d" -ForegroundColor Green
+    Write-Host "  2. Verify PKI health:" -NoNewline
     Write-Host "   curl -k https://localhost:9000/health" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "3. Access OpenXPKI Web UI:"
-    Write-Host "   http://localhost:8080  (or https://localhost:8443)" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "4. Access Grafana:"
-    Write-Host "   http://localhost:3000  (admin/eca-admin)" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "5. Run tests:"
-    Write-Host "   ./scripts/run-tests.sh" -ForegroundColor Green
+    Write-Host "       (expect {`"status`":`"ok`"})"
+    Write-Host "  3. Open OpenXPKI Web UI:" -NoNewline
+    Write-Host " http://localhost:8080" -ForegroundColor Green
+    Write-Host "       (or https://localhost:8443)"
+    Write-Host "  4. Open Grafana:" -NoNewline
+    Write-Host "          http://localhost:3000" -ForegroundColor Green
+    Write-Host "       (admin/eca-admin)"
+    Write-Host "  5. Run automated checks:" -NoNewline
+    Write-Host " ./scripts/run-tests.sh" -ForegroundColor Green
     Write-Host ""
 }
 
