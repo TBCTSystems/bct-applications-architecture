@@ -39,7 +39,7 @@
 
 .LINK
     Documentation: docs/ARCHITECTURE.md (Process Signaling Pattern)
-    Sequence Diagram: docs/diagrams/acme_renewal_sequence.puml
+    Sequence Diagram: docs/diagrams/acme_renewal_sequence.mmd
     Architecture: ECA-ACME Agent Responsibilities
 
 .EXAMPLE

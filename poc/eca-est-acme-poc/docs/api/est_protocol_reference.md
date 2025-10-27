@@ -8,7 +8,7 @@ This document provides a comprehensive reference for the EST (Enrollment over Se
 
 **Intended Audience**: Developers implementing EST client logic for the ECA-EST agent, system architects reviewing the protocol implementation, and operators troubleshooting client certificate enrollment and renewal issues.
 
-**Related Documentation**: See `docs/ARCHITECTURE.md` (Section 3.7.4) for EST protocol overview, `docs/diagrams/est_enrollment_sequence.puml` for detailed interaction flow diagrams, and `pki/config/provisioners.json` for EST provisioner configuration.
+**Related Documentation**: See `docs/ARCHITECTURE.md` (Section 3.7.4) for EST protocol overview, `docs/diagrams/est_enrollment_sequence.mmd` for detailed interaction flow diagrams, and `pki/config/provisioners.json` for EST provisioner configuration.
 
 ---
 

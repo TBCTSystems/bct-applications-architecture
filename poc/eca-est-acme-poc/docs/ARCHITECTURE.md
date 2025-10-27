@@ -576,13 +576,13 @@ These layered security controls provide defense-in-depth, ensuring that compromi
 
 ## Diagram References
 
-The following architectural diagrams provide visual representations of the system structure, deployment topology, and data relationships. These diagrams are maintained as source files in the repository and should be rendered using appropriate tools (PlantUML for `.puml` files, Mermaid for `.mmd` files).
+The following architectural diagrams provide visual representations of the system structure, deployment topology, and data relationships. Source files are now authored in Mermaid (`.mmd`) so they render natively in GitHub, docs-as-code pipelines, and most Markdown viewers.
 
 ### Component Overview Diagram
 
-**File Path**: `docs/diagrams/component_overview.puml`
+**File Path**: `docs/diagrams/component_overview.mmd`
 
-**Format**: PlantUML C4 Container Diagram
+**Format**: Mermaid flowchart (C4-inspired container view)
 
 **Description**: This diagram illustrates the complete system architecture showing all six deployable containers (PKI, ECA-ACME Agent, ECA-EST Agent, Target Server, Target Client, Web UI) and their communication relationships. Each container is annotated with its technology stack (PowerShell, NGINX, Node.js, etc.) and communication patterns are shown with directional arrows labeled by protocol (HTTPS/ACME, HTTPS/EST, Docker exec, shared volume).
 
@@ -590,9 +590,9 @@ The following architectural diagrams provide visual representations of the syste
 
 ### Deployment Architecture Diagram
 
-**File Path**: `docs/diagrams/deployment_architecture.puml`
+**File Path**: `docs/diagrams/deployment_architecture.mmd`
 
-**Format**: PlantUML C4 Deployment Diagram
+**Format**: Mermaid flowchart (deployment topology)
 
 **Description**: This diagram shows the physical deployment topology of the Docker Compose environment on a single host machine. It visualizes Docker containers as deployment nodes, Docker named volumes (`server-certs`, `client-certs`, `pki-data`) as persistent storage, the Docker bridge network (`eca-poc-network`) connecting containers, and port mappings exposing services to the host (443 for NGINX HTTPS, 8080 for Web UI, 9000 for step-ca kept internal).
 

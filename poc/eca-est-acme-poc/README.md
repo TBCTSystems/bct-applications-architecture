@@ -6,6 +6,15 @@ The Edge Certificate Agent (ECA) is a proof-of-concept system demonstrating auto
 
 This PoC showcases file-based certificate distribution, service reload automation (NGINX), and end-to-end testing of mutual TLS (mTLS) connectivity in a containerized environment.
 
+## Quickstart TL;DR
+
+1. `./init-volumes.sh` (or `./init-volumes.ps1`) once per developer machine to seed step-ca, OpenXPKI, and Docker volumes.
+2. `docker compose up -d` to launch ACME/EST agents, PKI services, target workloads, and optional observability.
+3. `docker compose ps` and `docker compose logs -f eca-acme-agent` to confirm the stack is healthy and watch renewals in real time.
+4. Hit `https://localhost:443` (target server), `https://localhost:9000` (step-ca), and `https://localhost:8443/.well-known/est/` (EST) to validate endpoints.
+
+Need the full walkthrough with troubleshooting tips? See [QUICKSTART.md](QUICKSTART.md).
+
 ## Setup
 
 ### Prerequisites

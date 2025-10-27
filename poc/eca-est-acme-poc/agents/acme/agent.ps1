@@ -58,7 +58,7 @@
 
 .LINK
     Architecture: docs/ARCHITECTURE.md (Event-Driven Architecture Pattern)
-    Sequence Diagram: docs/diagrams/acme_renewal_sequence.puml
+    Sequence Diagram: docs/diagrams/acme_renewal_sequence.mmd
     Task Specification: I2.T7 (ACME Agent Main Script)
 
 .EXAMPLE

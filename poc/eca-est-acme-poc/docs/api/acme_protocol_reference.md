@@ -8,7 +8,7 @@ This document provides a comprehensive reference for the ACME (Automatic Certifi
 
 **Intended Audience**: Developers implementing ACME client logic for the ECA-ACME agent, system architects reviewing the protocol implementation, and operators troubleshooting certificate renewal issues.
 
-**Related Documentation**: See `docs/ARCHITECTURE.md` for complete system architecture and `docs/diagrams/acme_renewal_sequence.puml` for detailed interaction flow diagrams.
+**Related Documentation**: See `docs/ARCHITECTURE.md` for complete system architecture and `docs/diagrams/acme_renewal_sequence.mmd` for detailed interaction flow diagrams.
 
 ## 1. Protocol Overview
 
