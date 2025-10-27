@@ -1,0 +1,2 @@
+# This file ensures Git tracks the target-server/challenge/ directory
+# ACME HTTP-01 challenge files will be written here during validation

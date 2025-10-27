@@ -1,0 +1,123 @@
+version: '3.8'
+
+# OpenXPKI EST Server Integration
+# This docker-compose file integrates OpenXPKI with step-ca for EST enrollment
+# Uses step-ca intermediate CA for unified PKI hierarchy
+
+x-base-image: &base-image
+  image: whiterabbitsecurity/openxpki3:3.32.8
+
+networks:
+  eca-poc-network:
+    external: true
+
+volumes:
+  openxpkidb:
+  openxpkisocket:
+  openxpkiclientsocket:
+  openxpkidbsocket:
+  openxpkilog:
+  openxpkilogui:
+  openxpkidownload:
+
+services:
+  openxpki-db:
+    container_name: OpenXPKI_Database
+    image: mariadb:11.4
+    command: --default-authentication-plugin=mysql_native_password
+    user: mysql:mysql
+    networks:
+      - eca-poc-network
+    volumes:
+      - openxpkidb:/var/lib/mysql
+      - openxpkidbsocket:/var/run/mysqld/
+      - ./openxpki-config/contrib/sql/schema-mariadb.sql:/docker-entrypoint-initdb.d/schema-mariadb.sql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    environment:
+      MYSQL_DATABASE: openxpki
+      MYSQL_USER: openxpki
+      MYSQL_PASSWORD: openxpki
+      MYSQL_ROOT_PASSWORD: topsecret
+
+  openxpki-server:
+    << : *base-image
+    container_name: OpenXPKI_Server
+    command: /usr/bin/openxpkictl start server --nd
+    user: openxpki:openxpki
+    group_add:
+     - openxpkiclient
+    tmpfs:
+      - /tmp
+    networks:
+      - eca-poc-network
+    volumes:
+      - ./openxpki-config:/etc/openxpki
+      - ./config/client.key:/home/pkiadm/.oxi/client.key
+      - ./secrets:/etc/openxpki/local/secrets:ro
+      - openxpkilog:/var/log/openxpki
+      - openxpkisocket:/run/openxpkid
+      - openxpkidbsocket:/var/run/mysqld/
+      - openxpkidownload:/var/www/download
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+    healthcheck:
+      test: /usr/bin/openxpkictl status server
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      openxpki-db:
+        condition: service_healthy
+
+  openxpki-client:
+    << : *base-image
+    container_name: OpenXPKI_Client
+    command: /usr/bin/openxpkictl start client --nd
+    user: openxpkiclient:openxpkiclient
+    group_add:
+     - www-data
+    tmpfs:
+      - /tmp
+    networks:
+      - eca-poc-network
+    volumes:
+      - ./openxpki-config/client.d:/etc/openxpki/client.d
+      - openxpkilogui:/var/log/openxpki-client
+      - openxpkisocket:/run/openxpkid
+      - openxpkiclientsocket:/run/openxpki-clientd
+      - openxpkidbsocket:/var/run/mysqld/
+    healthcheck:
+      test: /usr/bin/openxpkictl status client
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      openxpki-server:
+        condition: service_healthy
+
+  openxpki-web:
+    << : *base-image
+    container_name: OpenXPKI_WebUI
+    command: /usr/bin/start-webserver apache
+    networks:
+      - eca-poc-network
+    ports:
+      - "9080:80/tcp"
+      - "8443:443/tcp"
+    volumes:
+      - ./openxpki-config/contrib/apache2-openxpki-site.conf:/etc/apache2/sites-enabled/openxpki.conf
+      - ./openxpki-config/tls/:/etc/openxpki/tls/
+      - openxpkiclientsocket:/run/openxpki-clientd
+      - openxpkidownload:/var/www/download:ro
+    healthcheck:
+      test: wget -q http://localhost/healthcheck/ping
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      openxpki-client:
+        condition: service_healthy

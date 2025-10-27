@@ -1,0 +1,608 @@
+# ============================================
+# Edge Certificate Agent (ECA) - Docker Compose Configuration
+# ============================================
+# This file defines the complete containerized infrastructure for the ECA PoC
+# including PKI service, autonomous agents, and target services.
+#
+# Prerequisites:
+#   - Docker Engine 20.10+
+#   - Docker Compose 2.x
+#   - Copy .env.example to .env and configure
+#
+# Usage:
+#   docker-compose up -d          # Start all services
+#   docker-compose ps             # View service status
+#   docker-compose logs -f        # Follow logs
+#   docker-compose down           # Stop and remove containers
+#
+# For more information, see docs/01_Plan_Overview_and_Setup.md
+
+version: '3.8'
+
+# ============================================
+# Network Configuration
+# ============================================
+networks:
+  eca-poc-network:
+    driver: bridge
+    name: eca-poc-network
+
+# ============================================
+# Volume Configuration
+# ============================================
+# Named volumes provide persistent storage for certificates and PKI data
+volumes:
+  # Server certificates (ACME) - shared between agent and NGINX
+  server-certs:
+    name: server-certs
+
+  # Client certificates (EST) - shared between agent and client
+  client-certs:
+    name: client-certs
+
+  # PKI/CA persistent data (database, keys, configuration)
+  pki-data:
+    name: pki-data
+
+  # ACME HTTP-01 challenge directory - shared between agent and NGINX
+  challenge:
+    name: challenge
+
+  # EST server persistent data (certificates)
+  est-data:
+    name: est-data
+
+  # EST server secrets (private keys)
+  est-secrets:
+    name: est-secrets
+
+  # OpenXPKI configuration volume
+  openxpki-config-data:
+    name: openxpki-config-data
+
+  # OpenXPKI database volume
+  openxpki-db:
+    name: openxpki-db
+
+  # OpenXPKI socket volumes for inter-container communication
+  openxpki-socket:
+    name: openxpki-socket
+
+  openxpki-client-socket:
+    name: openxpki-client-socket
+
+  openxpki-db-socket:
+    name: openxpki-db-socket
+
+  # OpenXPKI log volumes
+  openxpki-log:
+    name: openxpki-log
+
+  openxpki-log-ui:
+    name: openxpki-log-ui
+
+  # OpenXPKI download volume
+  openxpki-download:
+    name: openxpki-download
+
+  # Observability stack volumes
+  loki-data:
+    name: loki-data
+  grafana-data:
+    name: grafana-data
+  fluentd-buffer:
+    name: fluentd-buffer
+
+  # CRL (Certificate Revocation List) volume
+  crl-data:
+    name: crl-data
+
+# ============================================
+# Service Definitions
+# ============================================
+services:
+
+  # ------------------------------------------
+  # PKI Service (Certificate Authority)
+  # ------------------------------------------
+  # Smallstep step-ca providing ACME and EST provisioners
+  # This service must be healthy before agents can start
+  # CRL (Certificate Revocation List) endpoint: http://pki:9001/crl/ca.crl
+  pki:
+    build:
+      context: pki/
+    container_name: eca-pki
+    networks:
+      - eca-poc-network
+    ports:
+      - "9000:9000"  # step-ca HTTPS API
+      - "9001:9001"  # CRL HTTP server
+    volumes:
+      - pki-data:/home/step
+      - crl-data:/home/step/crl
+    environment:
+      # step-ca Docker image initialization variables
+      # These configure the CA on first startup
+      DOCKER_STEPCA_INIT_NAME: "ECA-PoC-CA"
+      DOCKER_STEPCA_INIT_DNS_NAMES: "pki,localhost"
+      DOCKER_STEPCA_INIT_ADDRESS: ":9000"
+      # Certificate lifetime for demo purposes (short-lived certs)
+      DOCKER_STEPCA_INIT_PROVISIONER_NAME: "admin"
+      # Empty password for PoC (production should use real passwords)
+      DOCKER_STEPCA_INIT_PASSWORD: ""
+      # Password file location (tells base entrypoint where to move password)
+      PWDPATH: "/home/step/secrets/password"
+    healthcheck:
+      # Health check validates CA API is responding
+      # Note: -k flag required due to self-signed CA certificate
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # OpenXPKI Database (MariaDB)
+  # ------------------------------------------
+  # Database backend for OpenXPKI workflows and certificate data
+  openxpki-db:
+    image: mariadb:11.4
+    container_name: eca-openxpki-db
+    command: --default-authentication-plugin=mysql_native_password
+    user: mysql:mysql
+    networks:
+      - eca-poc-network
+    volumes:
+      - openxpki-db:/var/lib/mysql
+      - openxpki-db-socket:/var/run/mysqld/
+      - openxpki-config-data:/config:ro
+    environment:
+      MYSQL_DATABASE: openxpki
+      MYSQL_USER: openxpki
+      MYSQL_PASSWORD: openxpki
+      MYSQL_ROOT_PASSWORD: ${OPENXPKI_DB_ROOT_PASSWORD:-topsecret}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # OpenXPKI Server (Core PKI Engine)
+  # ------------------------------------------
+  # OpenXPKI workflow processor and certificate signing engine
+  # Integrates with step-ca EST intermediate CA
+  openxpki-server:
+    image: whiterabbitsecurity/openxpki3:3.32.8
+    container_name: eca-openxpki-server
+    command: /usr/bin/openxpkictl start server --nd
+    user: openxpki:openxpki
+    group_add:
+      - openxpkiclient
+    tmpfs:
+      - /tmp
+    networks:
+      - eca-poc-network
+    volumes:
+      - openxpki-config-data:/etc/openxpki
+      - openxpki-log:/var/log/openxpki
+      - openxpki-socket:/run/openxpkid
+      - openxpki-db-socket:/var/run/mysqld/
+      - openxpki-download:/var/www/download
+      - pki-data:/pki:ro  # Read-only access to step-ca certificates
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+    healthcheck:
+      test: /usr/bin/openxpkictl status server
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      openxpki-db:
+        condition: service_healthy
+      pki:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # OpenXPKI Client (API Gateway)
+  # ------------------------------------------
+  # Session management and protocol endpoint handler
+  openxpki-client:
+    image: whiterabbitsecurity/openxpki3:3.32.8
+    container_name: eca-openxpki-client
+    command: /usr/bin/openxpkictl start client --nd
+    user: openxpkiclient:openxpkiclient
+    group_add:
+      - www-data
+    tmpfs:
+      - /tmp
+    networks:
+      - eca-poc-network
+    volumes:
+      - openxpki-config-data:/etc/openxpki:ro
+      - openxpki-log-ui:/var/log/openxpki-client
+      - openxpki-socket:/run/openxpkid
+      - openxpki-client-socket:/run/openxpki-clientd
+      - openxpki-db-socket:/var/run/mysqld/
+    healthcheck:
+      test: /usr/bin/openxpkictl status client
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      openxpki-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # OpenXPKI Web UI (EST Endpoint)
+  # ------------------------------------------
+  # Apache-based web frontend providing EST endpoint and certificate management UI
+  # EST endpoint: https://localhost:8443/.well-known/est/
+  openxpki-web:
+    image: whiterabbitsecurity/openxpki3:3.32.8
+    container_name: eca-openxpki-web
+    command: >
+      /bin/sh -c "
+        ln -sf /etc/openxpki/contrib/apache2-openxpki-site.conf /etc/apache2/sites-enabled/openxpki.conf &&
+        /usr/bin/start-webserver apache
+      "
+    networks:
+      - eca-poc-network
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - openxpki-config-data:/etc/openxpki
+      - openxpki-client-socket:/run/openxpki-clientd
+      - openxpki-download:/var/www/download:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-hsts -q http://localhost/ -O /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      openxpki-client:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # ACME Agent (Server Certificate Management)
+  # ------------------------------------------
+  # PowerShell-based autonomous agent for ACME protocol
+  # Monitors and renews server certificates for target-server
+  eca-acme-agent:
+    build:
+      context: .
+      dockerfile: agents/acme/Dockerfile
+    container_name: eca-acme-agent
+    networks:
+      - eca-poc-network
+    volumes:
+      # Certificate output directory
+      - server-certs:/certs/server
+      # ACME HTTP-01 challenge directory
+      - challenge:/challenge
+      # Docker socket access for triggering NGINX reload via docker exec
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      AGENT_NAME: ${ACME_AGENT_NAME:-acme}
+      AGENT_ENV_PREFIX: ${ACME_AGENT_PREFIX:-ACME_}
+      # PKI service endpoint
+      PKI_URL: ${PKI_URL:-https://pki:9000}
+      # Domain name for certificate Subject Alternative Name (SAN)
+      ACME_DOMAIN: ${ACME_DOMAIN:-target-server}
+      # Certificate lifecycle settings
+      CERT_LIFETIME_MINUTES: ${CERT_LIFETIME_MINUTES:-10}
+      RENEWAL_THRESHOLD_PCT: ${RENEWAL_THRESHOLD_PCT:-75}
+      # Agent operation settings
+      CHECK_INTERVAL_SEC: ${CHECK_INTERVAL_SEC:-60}
+      LOG_FORMAT: json  # JSON logging for FluentD
+      # Paths for certificate output
+      CERT_PATH: /certs/server/cert.pem
+      KEY_PATH: /certs/server/key.pem
+      CHAIN_PATH: /certs/server/chain.pem
+    # FluentD logging driver
+    # Note: Docker logging drivers can't use service names (fluentd:24224)
+    # On Linux: Use the Docker bridge gateway IP (typically 172.17.0.1)
+    # On Mac/Windows: Use host.docker.internal (Docker Desktop feature)
+    # This configuration uses the Linux bridge IP
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "172.17.0.1:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+        fluentd-retry-wait: "1s"
+        fluentd-max-retries: "3"
+    depends_on:
+      pki:
+        condition: service_healthy
+      fluentd:
+        condition: service_started
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # EST Agent (Client Certificate Management)
+  # ------------------------------------------
+  # PowerShell-based autonomous agent for EST protocol
+  # Monitors and renews client certificates for target-client
+  eca-est-agent:
+    build:
+      context: .
+      dockerfile: agents/est/Dockerfile
+    container_name: eca-est-agent
+    networks:
+      - eca-poc-network
+    volumes:
+      # Certificate output directory
+      - client-certs:/certs/client
+      # Read-only access to PKI volume for bootstrap certificate
+      - pki-data:/home/step:ro
+    environment:
+      AGENT_NAME: ${EST_AGENT_NAME:-est}
+      AGENT_ENV_PREFIX: ${EST_AGENT_PREFIX:-EST_}
+      # OpenXPKI EST server endpoint
+      PKI_URL: ${EST_URL:-https://openxpki-web:443}
+      # EST bootstrap certificate (PRIMARY: mTLS authentication for initial enrollment)
+      EST_BOOTSTRAP_CERT_PATH: /home/step/bootstrap-certs/bootstrap-client.pem
+      EST_BOOTSTRAP_KEY_PATH: /home/step/bootstrap-certs/bootstrap-client.key
+      # Device identifier (included in certificate CN)
+      EST_DEVICE_NAME: ${EST_DEVICE_NAME:-client-device-001}
+      # Certificate lifecycle settings
+      CERT_LIFETIME_MINUTES: ${CERT_LIFETIME_MINUTES:-10}
+      RENEWAL_THRESHOLD_PCT: ${RENEWAL_THRESHOLD_PCT:-75}
+      # Agent operation settings
+      CHECK_INTERVAL_SEC: ${CHECK_INTERVAL_SEC:-60}
+      LOG_FORMAT: json  # JSON logging for FluentD
+      # Paths for certificate output
+      CERT_PATH: /certs/client/cert.pem
+      KEY_PATH: /certs/client/key.pem
+      CHAIN_PATH: /certs/client/chain.pem
+    # FluentD logging driver
+    # Note: Docker logging drivers can't use service names (fluentd:24224)
+    # On Linux: Use the Docker bridge gateway IP (typically 172.17.0.1)
+    # On Mac/Windows: Use host.docker.internal (Docker Desktop feature)
+    # This configuration uses the Linux bridge IP
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "172.17.0.1:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+        fluentd-retry-wait: "1s"
+        fluentd-max-retries: "3"
+    depends_on:
+      openxpki-web:
+        condition: service_healthy
+      fluentd:
+        condition: service_started
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # Target Server (NGINX Web Server)
+  # ------------------------------------------
+  # Demonstrates server certificate usage and automatic reload
+  # Serves HTTPS using certificates from eca-acme-agent
+  target-server:
+    build:
+      context: target-server/
+    container_name: eca-target-server
+    networks:
+      - eca-poc-network
+    ports:
+      - "443:443"
+      - "80:80"  # HTTP for ACME HTTP-01 challenge validation
+    volumes:
+      # Server certificates from ACME agent (read-write to allow bootstrap cert creation)
+      - server-certs:/certs/server
+      # ACME HTTP-01 challenge directory (read-only)
+      - challenge:/challenge:ro
+      # Note: NGINX configuration will be added in later tasks
+      # Configuration should reference /certs/server/cert.pem and /certs/server/key.pem
+    depends_on:
+      - eca-acme-agent
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # Target Client (Alpine Container)
+  # ------------------------------------------
+  # Simulated client device using EST-managed certificates
+  # Uses certificates from eca-est-agent for mTLS authentication
+  target-client:
+    build:
+      context: target-client/
+    container_name: eca-target-client
+    networks:
+      - eca-poc-network
+    volumes:
+      # Client certificates from EST agent
+      - client-certs:/certs/client:ro
+    command: sleep infinity
+    depends_on:
+      - eca-est-agent
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # Web UI (Interactive Dashboard)
+  # ------------------------------------------
+  # Modern React-based dashboard for real-time certificate monitoring
+  # Features:
+  #   - Real-time log streaming from Loki
+  #   - Certificate lifecycle visualization
+  #   - Agent health monitoring
+  #   - Interactive agent control buttons
+  #   - Dark/light theme toggle
+  #
+  # Access: http://localhost:8888
+  #
+  # NOTE: This service is marked as optional via the 'optional' profile.
+  # To enable it, run: docker compose --profile optional up -d
+  web-ui:
+    profiles:
+      - optional
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: eca-web-ui
+    networks:
+      - eca-poc-network
+    ports:
+      - "8888:8080"  # Changed to 8888 to avoid conflict with OpenXPKI
+    volumes:
+      # Read-only access to certificates for status display
+      - server-certs:/certs/server:ro
+      - client-certs:/certs/client:ro
+      # Docker socket for agent control functionality
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Loki endpoint for log queries
+      LOKI_URL: http://loki:3100
+      # Node environment
+      NODE_ENV: production
+      PORT: 8080
+      # Optional: Certificate paths
+      SERVER_CERT_PATH: /certs/server
+      CLIENT_CERT_PATH: /certs/client
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      loki:
+        condition: service_healthy
+      eca-acme-agent:
+        condition: service_started
+      eca-est-agent:
+        condition: service_started
+    restart: unless-stopped
+
+  # ============================================
+  # Test Runner (Optional - use --profile testing)
+  # ============================================
+
+  # ------------------------------------------
+  # Test Runner (Pester Tests in Docker)
+  # ------------------------------------------
+  # Runs unit and integration tests in isolated Docker environment
+  # Usage: docker compose run --rm test-runner
+  test-runner:
+    profiles:
+      - testing
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    container_name: eca-test-runner
+    networks:
+      - eca-poc-network
+    volumes:
+      # Mount source code for live updates
+      - ./agents:/workspace/agents:ro
+      - ./tests:/workspace/tests:ro
+      # Mount scripts
+      - ./scripts:/workspace/scripts:ro
+    environment:
+      # Test configuration
+      PKI_URL: ${PKI_URL:-https://pki:9000}
+      EST_URL: ${EST_URL:-https://openxpki-web:443}
+      # Disable coverage by default (can override)
+      GENERATE_COVERAGE: ${GENERATE_COVERAGE:-false}
+    # Override default command for flexibility
+    # Default: Run all tests
+    # Override with: docker compose run --rm test-runner pwsh -Command "Invoke-Pester -Path ./tests/unit"
+    depends_on:
+      pki:
+        condition: service_healthy
+
+  # ============================================
+  # Observability Stack (FluentD + Loki + Grafana)
+  # ============================================
+
+  # ------------------------------------------
+  # FluentD (Log Aggregation)
+  # ------------------------------------------
+  # Collects logs from Docker containers and forwards to Loki
+  fluentd:
+    build:
+      context: ./fluentd
+      dockerfile: Dockerfile
+    container_name: eca-fluentd
+    networks:
+      - eca-poc-network
+    ports:
+      - "24224:24224"      # FluentD forward protocol
+      - "24224:24224/udp"  # FluentD forward protocol (UDP)
+      - "24220:24220"      # FluentD monitoring endpoint
+    volumes:
+      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf:ro
+      - fluentd-buffer:/var/log/fluentd/buffer
+    environment:
+      - FLUENTD_CONF=fluent.conf
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # Grafana Loki (Log Storage)
+  # ------------------------------------------
+  # Lightweight log aggregation system for storing and querying logs
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: eca-loki
+    networks:
+      - eca-poc-network
+    ports:
+      - "3100:3100"  # Loki HTTP API
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      - fluentd
+    restart: unless-stopped
+
+  # ------------------------------------------
+  # Grafana (Visualization & Dashboards)
+  # ------------------------------------------
+  # Web-based analytics and monitoring platform
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: eca-grafana
+    networks:
+      - eca-poc-network
+    ports:
+      - "3000:3000"  # Grafana web UI
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      # Admin credentials
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-eca-admin}
+      # Security settings
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      # Server settings
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped

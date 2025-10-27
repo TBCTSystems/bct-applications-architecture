@@ -1,0 +1,88 @@
+#Sample Mockup Config for Token config of a single realm
+# The left side are fixed aliases used in the code, the right side
+# are aribtrary chosen names, referencing the tokens below.
+type:
+    certsign: ca-signer
+    datasafe: svault
+    cmcra: ratoken
+    scep: ratoken
+
+# The actual token setup
+token:
+    default: &default_token
+        backend: OpenXPKI::Crypto::Backend::OpenSSL
+
+        # Template to create key, available vars are
+        # ALIAS (ca-signer-1), GROUP (ca-signer), GENERATION (1)
+        # KEY_IDENTIFIER (00:AA:BB...), IDENTIFIER (aGSNY1Z...)
+        key_store: DATAPOOL
+        key: "[% KEY_IDENTIFIER %]"
+
+        # for file based keys use
+        # key_store: OPENXPKI
+        # key: /etc/openxpki/local/keys/[% PKI_REALM %]/[% ALIAS %].pem
+
+        # possible values are OpenSSL, nCipher, LunaCA
+        engine: OpenSSL
+        engine_section: ''
+        engine_usage: ''
+
+        # OpenSSL binary location
+        shell: /usr/bin/openssl
+
+        # OpenSSL binary call gets wrapped with this command
+        wrapper: ''
+
+        # random file to use for OpenSSL
+        randfile: /var/openxpki/rand
+
+        # Default value for import, recorded in database, can be overriden
+        secret: default
+
+    # use ALIAS as key as it makes debug and management easier
+    # Modified for EST: use file-based keys instead of DATAPOOL
+    ca-signer:
+        <<: *default_token
+        key_store: OPENXPKI
+        key: /etc/openxpki/local/keys/[% PKI_REALM %]/[% ALIAS %].pem
+
+    # the old RSA key based token
+    # if you are migrating from an older version you must keep this as
+    # long as you have encrypted data in your datapool!
+    vault:
+        <<: *default_token
+        key_store: OPENXPKI
+        key: /etc/openxpki/local/keys/[% ALIAS %].pem
+
+    # the new datapool encryption based on a symmetric key
+    svault:
+        class: OpenXPKI::Crypto::Token::Vault
+        secret: svault
+
+    ratoken:
+        # the class has datapool with key identifier set as builtin default
+        class: OpenXPKI::Crypto::Token::Inline
+        export: 1
+        secret: ratoken
+
+    # if you need to use the old token mechanism use this section
+    #ratoken:
+    #    <<: *default_token
+    #    secret: ratoken
+
+# Define the secret groups
+secret:
+    default:
+        # this let OpenXPKI use the secret of the same name from system.crypto
+        # if you do not want to share the secret just replace this line with
+        # the config found in system.crypto. You can create additional secrets
+        # by adding similar blocks with another key
+        import: 1
+
+    ratoken:
+        import: 1
+        export: 1
+
+    # Load a global secret as symmetric vault key
+    svault:
+        import: 1

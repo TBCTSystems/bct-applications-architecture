@@ -1,0 +1,83 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Deployment Diagram - Edge Certificate Agent PoCs (Docker Compose)
+
+Deployment_Node(docker_host, "Docker Host", "Linux/macOS/Windows + Docker Engine 20.10+") {
+
+  Deployment_Node(docker_network, "Docker Bridge Network: eca-poc-network", "Bridge Driver") {
+
+    Deployment_Node(pki_container, "Container: pki", "smallstep/step-ca:0.25") {
+      Container(step_ca, "step-ca Process", "Go Binary", "Certificate Authority\nACME + EST Provisioners")
+    }
+
+    Deployment_Node(acme_agent_container, "Container: eca-acme-agent", "PowerShell:7.4-alpine") {
+      Container(acme_agent, "Agent Script", "PowerShell Core", "ACME client logic\nCertificate monitoring")
+    }
+
+    Deployment_Node(est_agent_container, "Container: eca-est-agent", "PowerShell:7.4-alpine") {
+      Container(est_agent, "Agent Script", "PowerShell Core", "EST client logic\nCertificate monitoring")
+    }
+
+    Deployment_Node(server_container, "Container: target-server", "nginx:1.25-alpine") {
+      Container(nginx, "NGINX Process", "C Binary", "Web server\nTLS termination")
+    }
+
+    Deployment_Node(client_container, "Container: target-client", "alpine:latest") {
+      Container(curl, "curl/OpenSSL", "C Binary", "mTLS test client")
+    }
+
+    Deployment_Node(ui_container, "Container: web-ui (optional)", "node:20-alpine") {
+      Container(web_ui, "Express App", "Node.js", "Certificate dashboard")
+    }
+  }
+
+  Deployment_Node(docker_volumes, "Docker Volumes", "Storage Driver") {
+    ContainerDb(vol_server, "server-certs", "Named Volume", "/certs/server")
+    ContainerDb(vol_client, "client-certs", "Named Volume", "/certs/client")
+    ContainerDb(vol_pki, "pki-data", "Named Volume", "/home/step")
+  }
+
+  Deployment_Node(host_network, "Host Network Interfaces", "Network Stack") {
+    Node(host_port_443, "Port 443", "HTTPS") #LightGray
+    Node(host_port_9000, "Port 9000", "HTTPS API") #LightGray
+    Node(host_port_8080, "Port 8080", "HTTP") #LightGray
+  }
+}
+
+Deployment_Node(developer_machine, "Developer/Operator Machine", "Web Browser, Docker CLI") {
+  Person(operator, "Operator")
+}
+
+' Volume mounts
+Rel(acme_agent, vol_server, "Writes certs", "Volume mount")
+Rel(nginx, vol_server, "Reads certs", "Volume mount")
+Rel(est_agent, vol_client, "Writes certs", "Volume mount")
+Rel(curl, vol_client, "Reads certs", "Volume mount")
+Rel(step_ca, vol_pki, "Reads/writes CA data", "Volume mount")
+Rel(web_ui, vol_server, "Reads cert metadata", "Volume mount (ro)")
+Rel(web_ui, vol_client, "Reads cert metadata", "Volume mount (ro)")
+
+' Network communication (within Docker network)
+Rel(acme_agent, step_ca, "ACME HTTPS API", "Port 9000")
+Rel(est_agent, step_ca, "EST HTTPS API", "Port 9000")
+Rel(curl, nginx, "mTLS HTTPS", "Port 443")
+Rel(step_ca, nginx, "HTTP-01 challenge", "Port 80/443")
+
+' Port mappings to host
+Rel(nginx, host_port_443, "Exposed", "Port mapping")
+Rel(step_ca, host_port_9000, "Exposed", "Port mapping")
+Rel(web_ui, host_port_8080, "Exposed", "Port mapping")
+
+' Operator interactions
+Rel(operator, host_port_443, "Accesses web service", "HTTPS Browser")
+Rel(operator, host_port_8080, "Views dashboard", "HTTP Browser")
+Rel(operator, host_port_9000, "Administers PKI", "step CLI / Browser")
+Rel(operator, docker_host, "Manages containers", "docker/docker-compose CLI")
+
+' Agent to service management (via Docker socket - not shown for clarity)
+' Rel(acme_agent, nginx, "Reloads config", "docker exec")
+
+@enduml

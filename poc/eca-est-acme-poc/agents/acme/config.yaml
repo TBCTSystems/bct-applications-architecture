@@ -1,0 +1,115 @@
+# ACME Agent Configuration File
+# =============================
+# This configuration file provides default values for the ECA-ACME agent.
+# All values can be overridden by environment variables (see comments below).
+# The agent validates this configuration against the JSON schema at:
+# config/agent_config_schema.json
+
+# PKI Server Base URL
+# -------------------
+# Base URL for the step-ca ACME server API endpoint.
+# This is where the agent will connect to request certificates via ACME protocol.
+# Must include protocol (https) and port if non-standard.
+# Environment variable override: <prefix>PKI_URL (e.g., ACME_PKI_URL)
+pki_url: "https://pki:9000"
+
+# Certificate Output Path
+# ------------------------
+# Absolute filesystem path where the agent will write the issued certificate.
+# Format: PEM-encoded X.509 certificate with full chain.
+# The agent will set file permissions to 0644 (world-readable).
+# Parent directory must exist and be writable by the agent.
+# In Docker deployments, this typically points to a shared volume.
+# Environment variable override: <prefix>CERT_PATH (e.g., ACME_CERT_PATH)
+cert_path: "/certs/server/server.crt"
+
+# Private Key Output Path
+# ------------------------
+# Absolute filesystem path where the agent will write the private key.
+# Format: PEM-encoded PKCS#8 format (RSA-2048 or ECDSA P-256).
+# The agent will automatically set file permissions to 0600 (owner read/write only).
+# SECURITY WARNING: Never transmit this file over the network or expose it.
+# Parent directory must exist and be writable by the agent.
+# Environment variable override: <prefix>KEY_PATH (e.g., ACME_KEY_PATH)
+key_path: "/certs/server/server.key"
+
+# Domain Name
+# -----------
+# The domain name or hostname to request in the certificate.
+# This value will be used as both the Subject Common Name (CN) and
+# Subject Alternative Name (SAN) in the certificate request.
+# The ACME CA will validate this domain via HTTP-01 challenge, so the
+# agent must be reachable at http://{domain_name}/.well-known/acme-challenge/
+# Environment variable override: <prefix>DOMAIN_NAME (e.g., ACME_DOMAIN_NAME)
+domain_name: "target-server"
+
+# Renewal Threshold Percentage
+# -----------------------------
+# Trigger certificate renewal when this percentage of the certificate's
+# lifetime has elapsed. This provides a safety margin before expiration.
+# Value range: 1-100
+# Default: 75 (renew at 75% lifetime = 25% remaining)
+#
+# Examples:
+#   - For a 10-minute certificate: 75% triggers renewal after 7.5 minutes
+#   - For a 90-day certificate: 75% triggers renewal after 67.5 days
+#
+# Recommended values:
+#   - Short-lived certs (minutes/hours): 70-80 (narrower margin acceptable)
+#   - Long-lived certs (days/months): 75-85 (more safety margin)
+#
+# Environment variable override: <prefix>RENEWAL_THRESHOLD_PCT
+renewal_threshold_pct: 75
+
+# Check Interval (seconds)
+# -------------------------
+# Time to sleep between certificate expiration status checks.
+# Lower values = faster detection of approaching expiration, higher resource usage.
+# Higher values = reduced CPU/log usage, slower detection.
+# Default: 60 seconds
+#
+# Recommended values based on certificate lifetime:
+#   - Certificates lasting minutes: 10-30 seconds
+#   - Certificates lasting hours: 60-300 seconds
+#   - Certificates lasting days: 300-3600 seconds
+#
+# Environment variable override: <prefix>CHECK_INTERVAL_SEC
+check_interval_sec: 60
+
+# Notes on Additional Configuration
+# ----------------------------------
+# The following values are HARDCODED in the agent modules and cannot be
+# configured via this file or environment variables:
+#
+# - ACME Provisioner Name: "acme" (hardcoded in AcmeClient.psm1)
+#   This is the step-ca provisioner name used for ACME protocol.
+#
+# - Challenge Directory: "/challenge/.well-known/acme-challenge" (hardcoded in AcmeClient.psm1)
+#   This is where HTTP-01 challenge tokens are placed for CA validation.
+#
+# - Target Service Name: "target-server" (hardcoded in ServiceReloadController.psm1)
+#   This is the Docker container name for the NGINX service to reload.
+#
+# These values match the Docker Compose deployment architecture and should
+# not need modification for standard deployments. If you need to change them,
+# you must modify the corresponding PowerShell module source code.
+
+# =============================================================================
+# CRL (Certificate Revocation List) Configuration
+# =============================================================================
+# CRL validation settings for certificate revocation checking
+crl:
+  # Enable CRL validation checks
+  enabled: true
+
+  # URL to download CRL from (step-ca CRL endpoint)
+  url: "http://pki:9001/crl/ca.crl"
+
+  # Local cache path for downloaded CRL
+  cache_path: "/tmp/ca.crl"
+
+  # Maximum age of cached CRL before re-download (hours)
+  max_age_hours: 2.0
+
+  # Check certificates against CRL before renewal
+  check_before_renewal: true

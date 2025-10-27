@@ -1,0 +1,187 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/karol/edge-certificate-agent-poc/schemas/agent-config.json",
+  "title": "Edge Certificate Agent Configuration Schema",
+  "description": "JSON Schema for validating ACME and EST certificate agent configuration files. Configuration files are typically stored in YAML format but can also be provided via environment variables. This schema supports both ACME (Automatic Certificate Management Environment) and EST (Enrollment over Secure Transport) agent types.",
+  "type": "object",
+  "required": [
+    "pki_url",
+    "cert_path",
+    "key_path"
+  ],
+  "properties": {
+    "pki_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Base URL of the step-ca PKI API endpoint. This is the root URL where the certificate authority API is accessible. Must be a valid URI with scheme (http/https), hostname, and optional port.",
+      "examples": [
+        "https://pki:9000",
+        "https://pki.example.com:9000",
+        "https://ca-server.local:443"
+      ]
+    },
+    "cert_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute file system path where the agent will write the issued certificate in PEM format. The agent must have write permissions to this location. Parent directories must exist or be created by the agent. Typically points to a shared volume mount in containerized deployments.",
+      "examples": [
+        "/certs/server/server.crt",
+        "/certs/client/client.crt",
+        "/app/certificates/service.pem"
+      ]
+    },
+    "key_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute file system path where the agent will write the private key in PEM format (PKCS#8 encoding). The agent will automatically set file permissions to 0600 (owner read/write only) for security. This key should never be transmitted over the network and must be protected. Parent directories must exist or be created by the agent.",
+      "examples": [
+        "/certs/server/server.key",
+        "/certs/client/client.key",
+        "/app/certificates/service.key"
+      ]
+    },
+    "domain_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The domain name or hostname to be used as the Subject Common Name (CN) and/or Subject Alternative Name (SAN) in the certificate request. REQUIRED for ACME agents where the domain is validated via ACME challenge mechanisms. OPTIONAL for EST agents where identity may be established through bootstrap tokens. Supports wildcards (e.g., *.example.com) and multiple SANs may be supported depending on CA policy.",
+      "examples": [
+        "target-server",
+        "target-server.local",
+        "web-service.example.com",
+        "*.example.com"
+      ]
+    },
+    "device_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique device identifier or client name to be used as the Subject Common Name (CN) in the certificate request. REQUIRED for EST agents where the device identity is established through bootstrap token-based enrollment. OPTIONAL for ACME agents which typically use domain_name instead. This field represents a device or client identity (e.g., 'client-device-001', 'iot-sensor-042') rather than a DNS hostname. The agent will use this value to identify the device during EST enrollment and re-enrollment operations.",
+      "examples": [
+        "client-device-001",
+        "iot-sensor-042",
+        "edge-gateway-alpha",
+        "mobile-client-xyz"
+      ]
+    },
+    "renewal_threshold_pct": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 75,
+      "description": "Percentage of certificate lifetime elapsed at which the agent will trigger an automatic renewal. For example, a value of 75 means the agent will renew when 75% of the certificate's validity period has passed (i.e., 25% remaining). Lower values renew earlier (more safety margin but more frequent renewals), higher values renew later (fewer renewals but higher risk of expiration). Recommended range: 70-85.",
+      "examples": [
+        75,
+        80,
+        90
+      ]
+    },
+    "check_interval_sec": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 60,
+      "description": "Interval in seconds between periodic checks of certificate expiration status. The agent will sleep for this duration between checks. Lower values provide faster detection of approaching expiration and quicker response to renewal needs, but increase CPU usage and log verbosity. Higher values reduce resource consumption but may delay renewal detection. For production systems with short-lived certificates (minutes to hours), values between 10-60 seconds are recommended.",
+      "examples": [
+        60,
+        300,
+        3600,
+        10
+      ]
+    },
+    "bootstrap_token": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "One-time enrollment token used for initial EST enrollment to authenticate the agent with the certificate authority. REQUIRED for EST agents during their first enrollment when no existing certificate is available. NOT USED by ACME agents which rely on domain validation challenges instead. This token must be obtained from the step-ca administrator or provisioner API before agent deployment. This is a SENSITIVE value and should be stored securely (e.g., as an environment variable, not in version-controlled configuration files). After successful enrollment, the agent uses the issued certificate for subsequent renewals and this token is no longer needed.",
+      "examples": [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "abc123def456ghi789jkl012mno345pqr678",
+        "your-secure-bootstrap-token-here"
+      ]
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional unique identifier for this agent instance. Used for logging, monitoring, and operational identification purposes. If not provided, the agent may auto-generate an ID based on hostname, container ID, or other environmental factors. Useful in deployments with multiple agent instances to distinguish between them in logs and metrics.",
+      "examples": [
+        "acme-agent-server-01",
+        "est-agent-client-device-001",
+        "web-service-cert-agent"
+      ]
+    },
+    "log_level": {
+      "type": "string",
+      "enum": ["DEBUG", "INFO", "WARN", "ERROR"],
+      "default": "INFO",
+      "description": "Logging verbosity level. Controls the minimum severity of log messages that will be emitted. DEBUG provides the most detailed output (useful for troubleshooting), INFO provides standard operational logging, WARN logs only warnings and errors, ERROR logs only error conditions. This setting affects performance: DEBUG mode generates significantly more log volume and should only be used during development or troubleshooting. Production deployments should use INFO or WARN.",
+      "examples": ["INFO", "DEBUG", "WARN"]
+    },
+    "metrics_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable collection and export of operational metrics. When true, the agent will track and log performance metrics such as certificate check duration, renewal attempt counts, and error rates. These metrics are emitted as structured log entries (JSON format) that can be ingested by monitoring systems (Prometheus, Grafana Loki, etc.). Disabling metrics reduces log volume but limits observability. Recommended: true for production deployments to enable proactive monitoring and alerting.",
+      "examples": [true, false]
+    },
+    "env_var_prefix": {
+      "type": "string",
+      "minLength": 0,
+      "description": "Environment variable prefix for configuration overrides. When set, the agent will look for environment variables with this prefix (e.g., 'ACME_' prefix means 'ACME_PKI_URL' overrides 'pki_url'). This enables running multiple agents on the same host (especially Windows Services) without environment variable collisions. If not set or empty, the agent uses unprefixed environment variables (legacy behavior). CRITICAL for Windows deployments with multiple agents. Best practice: Set via AGENT_ENV_PREFIX environment variable before agent starts. See docs/WINDOWS_DEPLOYMENT.md for complete guidance.",
+      "examples": ["ACME_", "EST_", "mosquitto_eca_jwk_", ""]
+    },
+    "crl": {
+      "type": "object",
+      "description": "Certificate Revocation List (CRL) configuration for validating certificate revocation status. When enabled, the agent will download CRLs from the specified URL, cache them locally, and check certificates against the CRL before renewal. This implements RFC 5280 revocation checking to ensure revoked certificates are immediately replaced.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable or disable CRL validation checks. When true, the agent will download and validate certificates against the CRL."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to download the CRL from. Typically points to the CA's CRL distribution point (e.g., http://pki:9001/crl/ca.crl)."
+        },
+        "cache_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local filesystem path where the downloaded CRL will be cached. The agent must have write permissions to this location."
+        },
+        "max_age_hours": {
+          "type": "number",
+          "minimum": 0.1,
+          "default": 24.0,
+          "description": "Maximum age (in hours) of the cached CRL before forcing a re-download. Lower values ensure fresher revocation data but increase network traffic."
+        },
+        "check_before_renewal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check certificate revocation status before attempting renewal. If the certificate is revoked, force immediate renewal."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "_documentation": {
+    "version": "1.1.0",
+    "last_updated": "2025-10-26",
+    "environment_variable_prefixing": {
+      "description": "The agent configuration system supports prefixed environment variable overrides to prevent collisions in multi-agent deployments. This is critical on Windows where services share the System environment scope.",
+      "how_it_works": "1. Agent reads AGENT_ENV_PREFIX or AGENT_NAME environment variable at startup. 2. If AGENT_NAME is set, prefix becomes '<AGENT_NAME>_'. 3. Agent evaluates prefixed variables first (e.g., 'ACME_PKI_URL'), then falls back to unprefixed (e.g., 'PKI_URL'). 4. First match wins; subsequent prefixes/fallbacks are ignored.",
+      "precedence_order": ["<prefix>VARIABLE_NAME (highest priority)", "VARIABLE_NAME (unprefixed, legacy)", "YAML configuration file value", "Schema default value (lowest priority)"],
+      "example_scenarios": [
+        {
+          "scenario": "Single agent deployment (Docker, no prefix needed)",
+          "config": "# No AGENT_ENV_PREFIX set\nPKI_URL=https://pki:9000"
+        },
+        {
+          "scenario": "Multiple agents on Windows Server (prefixing required)",
+          "config": "# ACME Service:\nAGENT_ENV_PREFIX=ACME_\nACME_PKI_URL=https://pki:9000\nACME_DOMAIN_NAME=web-server-01\n\n# EST Service (different prefix, no collision):\nAGENT_ENV_PREFIX=EST_\nEST_PKI_URL=https://pki:9000\nEST_DEVICE_NAME=client-device-001"
+        }
+      ],
+      "migration_notes": "Existing deployments using unprefixed environment variables will continue to work (backward compatible). To adopt prefixing: 1. Set AGENT_ENV_PREFIX for each service. 2. Rename env vars to include prefix. 3. Restart services. 4. Verify via agent startup logs showing 'Environment variable override applied' with correct env_var names."
+    }
+  }
+}

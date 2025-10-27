@@ -1,0 +1,200 @@
+@startuml
+title ACME Server Certificate Renewal Flow
+
+actor "Agent Main Loop" as Agent
+participant "Certificate Monitor" as Monitor
+participant "Renewal Engine" as Engine
+participant "ACME Client" as ACME
+participant "Crypto Helper" as Crypto
+participant "step-ca PKI" as PKI
+participant "Certificate Installer" as Installer
+participant "Reload Controller" as Reload
+participant "NGINX (Target Server)" as NGINX
+participant "Shared Volume\n(/certs/server)" as Volume
+
+== Certificate Check Phase ==
+
+Agent -> Monitor : Check certificate status
+activate Monitor
+Monitor -> Volume : Read server.crt
+activate Volume
+Volume --> Monitor : Certificate file (PEM)
+deactivate Volume
+
+Monitor -> Crypto : Parse certificate\n(X509Certificate2)
+activate Crypto
+Crypto --> Monitor : Certificate object\n(Expiry: 2025-10-24 10:05:00)
+deactivate Crypto
+
+Monitor -> Monitor : Calculate lifetime remaining\n(10 min lifetime, 8 min elapsed = 80%)
+Monitor --> Agent : Certificate info\n(80% lifetime elapsed)
+deactivate Monitor
+
+== Renewal Decision Phase ==
+
+Agent -> Engine : Should renew?\n(threshold=75%, elapsed=80%)
+activate Engine
+Engine -> Engine : Evaluate: 80% > 75%\n→ RENEWAL NEEDED
+Engine --> Agent : Decision: RENEW
+deactivate Engine
+
+Agent -> Agent : Log: "Renewal triggered\n(80% threshold exceeded)"
+
+== ACME Protocol Phase ==
+
+Agent -> ACME : Request new certificate\n(domain: target-server)
+activate ACME
+
+ACME -> Crypto : Generate new RSA-2048 key pair
+activate Crypto
+Crypto --> ACME : Private key + Public key
+deactivate Crypto
+
+ACME -> Crypto : Generate CSR\n(CN=target-server, SAN=target-server)
+activate Crypto
+Crypto --> ACME : CSR (PEM)
+deactivate Crypto
+
+ACME -> PKI : POST /acme/acme/new-order\n{"identifiers": [{"type":"dns","value":"target-server"}]}
+activate PKI
+PKI --> ACME : Order created\n{status: "pending", authorizations: [...]}
+deactivate PKI
+
+ACME -> PKI : GET authorization URL
+activate PKI
+PKI --> ACME : Challenge details\n{type:"http-01", token:"abc123", url:"..."}
+deactivate PKI
+
+ACME -> Volume : Write challenge token\n(.well-known/acme-challenge/abc123)
+activate Volume
+Volume --> ACME : Write successful
+deactivate Volume
+
+ACME -> PKI : POST challenge URL\n(notify ready)
+activate PKI
+PKI -> NGINX : GET http://target-server/.well-known/acme-challenge/abc123
+activate NGINX
+NGINX -> Volume : Read challenge token
+activate Volume
+Volume --> NGINX : Token content
+deactivate Volume
+
+alt Challenge validation successful
+    NGINX --> PKI : Token response (validated)
+    deactivate NGINX
+    PKI --> ACME : Challenge status: valid
+    deactivate PKI
+
+    ACME -> PKI : POST /acme/acme/order/{id}/finalize\n{csr: "..."}
+    activate PKI
+    PKI -> PKI : Issue certificate\n(sign CSR with CA key)
+    PKI --> ACME : Order status: valid\n{certificate: "..."}
+    deactivate PKI
+
+    ACME -> PKI : GET certificate URL
+    activate PKI
+    PKI --> ACME : Certificate chain (PEM)
+    deactivate PKI
+
+    ACME --> Agent : Certificate + Private Key
+    deactivate ACME
+
+    Agent -> Agent : Log: "ACME renewal successful"
+
+    == Installation Phase ==
+
+    Agent -> Installer : Install certificate\n(cert, key, path=/certs/server)
+    activate Installer
+
+    alt Installation successful
+        Installer -> Volume : Atomic write server.key\n(mode: 0600)
+        activate Volume
+        Volume --> Installer : Write successful
+        deactivate Volume
+
+        Installer -> Volume : Atomic write server.crt
+        activate Volume
+        Volume --> Installer : Write successful
+        deactivate Volume
+
+        Installer --> Agent : Installation successful
+        deactivate Installer
+
+        Agent -> Agent : Log: "Certificate installed"
+
+        == Service Reload Phase ==
+
+        Agent -> Reload : Reload NGINX config
+        activate Reload
+
+        Reload -> NGINX : docker exec target-server\nnginx -s reload
+        activate NGINX
+        NGINX -> Volume : Read new server.crt & server.key
+        activate Volume
+        Volume --> NGINX : New certificate files
+        deactivate Volume
+
+        alt Reload successful
+            NGINX -> NGINX : Validate certificate & key\nUpdate TLS context
+            NGINX --> Reload : Exit code 0 (success)
+            deactivate NGINX
+
+            Reload --> Agent : Reload successful
+            deactivate Reload
+
+            Agent -> Agent : Log: "NGINX reloaded successfully"
+
+        else Reload failed
+            NGINX -> NGINX : Validation error or\nconfiguration problem
+            NGINX --> Reload : Exit code 1 (failure)
+            deactivate NGINX
+
+            Reload --> Agent : Reload failed (error details)
+            deactivate Reload
+
+            Agent -> Agent : Log ERROR: "NGINX reload failed\n(manual intervention required)"
+            note right of Agent
+                Certificate installed but not activated.
+                NGINX continues using old certificate.
+                Alert operator for manual reload.
+            end note
+        end
+
+    else Installation failed
+        Installer -> Installer : Atomic write failed\n(permission/disk error)
+        Installer --> Agent : Installation error
+        deactivate Installer
+
+        Agent -> Agent : Log ERROR: "Certificate installation failed"
+        note right of Agent
+            New certificate not written to volume.
+            System continues using existing certificate.
+            Retry on next check cycle.
+        end note
+    end
+
+else Challenge validation failed
+    NGINX --> PKI : Invalid response or timeout
+    deactivate NGINX
+    PKI --> ACME : Challenge status: invalid\n(error: validation failed)
+    deactivate PKI
+
+    ACME --> Agent : ACME error (challenge failed)
+    deactivate ACME
+
+    Agent -> Agent : Log ERROR: "ACME renewal failed\n(challenge validation error)"
+    note right of Agent
+        Challenge validation failed.
+        Possible causes:
+        - NGINX not serving challenge path
+        - Network connectivity issue
+        - Token file not accessible
+        Retry on next check cycle.
+    end note
+end
+
+== Sleep Phase ==
+
+Agent -> Agent : Sleep for check interval\n(e.g., 60 seconds)
+
+@enduml
