@@ -89,13 +89,6 @@ public sealed class CertificateAgent
             Console.WriteLine($"Account key saved to {_accountKeyPath}");
         }
 
-        if (_settings.Insecure)
-        {
-            Console.WriteLine("WARNING: TLS certificate validation disabled (--insecure mode)");
-            ServicePointManager.ServerCertificateValidationCallback = 
-                (sender, cert, chain, sslPolicyErrors) => true;
-        }
-
         var acmeUri = new Uri(_settings.StepCaUrl);
         var acme = new AcmeContext(acmeUri, accountKey);
 
