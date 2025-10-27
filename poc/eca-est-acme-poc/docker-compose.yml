@@ -260,7 +260,7 @@ services:
       - openxpki-client-socket:/run/openxpki-clientd
       - openxpki-download:/var/www/download:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-hsts -q http://localhost/ -O /dev/null"]
+      test: ["CMD-SHELL", "wget --no-hsts --no-check-certificate -q https://localhost/ -O /dev/null"]
       interval: 10s
       timeout: 5s
       retries: 5

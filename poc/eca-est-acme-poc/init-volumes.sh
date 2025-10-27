@@ -298,6 +298,7 @@ initialize_openxpki() {
             mkdir -p /config/local/secrets && \
             cp /pki/est-certs/est-ca.pem /config/local/secrets/est-ca.crt && \
             cp /pki/est-certs/est-ca.key /config/local/secrets/est-ca.key && \
+            cp /pki/certs/intermediate_ca.crt /config/local/secrets/step-intermediate.crt && \
             cp /pki/certs/root_ca.crt /config/local/secrets/root-ca.crt && \
             chmod 644 /config/local/secrets/*.crt && \
             chmod 600 /config/local/secrets/*.key
@@ -322,6 +323,44 @@ initialize_openxpki() {
         "
 
     log_success "OpenXPKI CA directories configured"
+}
+
+provision_openxpki_web_tls() {
+    log_info "Provisioning OpenXPKI web TLS materials..."
+
+    docker exec -i eca-pki bash -c "
+        set -euo pipefail
+        mkdir -p /home/step/tmp
+        STEPPATH=/home/step step ca certificate openxpki-web \
+            /home/step/tmp/openxpki-web.crt \
+            /home/step/tmp/openxpki-web.key \
+            --provisioner ${CA_PROVISIONER} \
+            --provisioner-password-file /home/step/secrets/password \
+            --ca-url https://localhost:9000 \
+            --root /home/step/certs/root_ca.crt \
+            --san openxpki-web \
+            --san localhost \
+            --bundle \
+            --force
+    "
+
+    docker run --rm \
+        -v "${VOLUME_PKI}:/pki:ro" \
+        -v "${VOLUME_OPENXPKI_CONFIG}:/config" \
+        alpine \
+        sh -c "
+            set -e
+            mkdir -p /config/tls/private /config/tls/endentity /config/tls/chain && \
+            cp /pki/tmp/openxpki-web.crt /config/tls/endentity/openxpki.crt && \
+            cp /pki/tmp/openxpki-web.key /config/tls/private/openxpki.pem && \
+            cp /pki/certs/root_ca.crt /config/tls/chain/root-ca.crt && \
+            chmod 600 /config/tls/private/openxpki.pem && \
+            chmod 644 /config/tls/endentity/openxpki.crt /config/tls/chain/root-ca.crt
+        "
+
+    docker exec eca-pki rm -f /home/step/tmp/openxpki-web.crt /home/step/tmp/openxpki-web.key >/dev/null 2>&1 || true
+
+    log_success "OpenXPKI web TLS certificate generated"
 }
 
 initialize_openxpki_database() {
@@ -383,6 +422,12 @@ import_certificates_to_openxpki() {
         --realm ${OPENXPKI_REALM} \
         --force-no-chain
 
+    # Import step-ca intermediate for bootstrap certificate chain
+    log_info "Importing step-ca intermediate certificate..."
+    docker exec eca-openxpki-server openxpkiadm certificate import \
+        --file /etc/openxpki/local/secrets/step-intermediate.crt \
+        --realm ${OPENXPKI_REALM}
+
     # Import EST CA and create ca-signer alias
     log_info "Importing EST CA certificate and creating ca-signer alias..."
     docker exec eca-openxpki-server openxpkiadm alias \
@@ -426,6 +471,8 @@ import_certificates_to_openxpki() {
     docker exec eca-openxpki-server openxpkiadm certificate import \
         --file /tmp/bootstrap-only.pem \
         --realm ${OPENXPKI_REALM}
+
+    docker exec eca-openxpki-server rm -f /tmp/bootstrap-only.pem >/dev/null 2>&1 || true
 
     log_success "Certificates imported into OpenXPKI database"
 }
@@ -484,6 +531,7 @@ main() {
 
     # Now initialize OpenXPKI with the EST certificates
     initialize_openxpki
+    provision_openxpki_web_tls
     initialize_openxpki_database
     import_certificates_to_openxpki
 
