@@ -396,6 +396,7 @@ function Copy-EstCertificatesToOpenXpki {
     Write-Success "EST certificates copied."
 
     Write-Info "Configuring OpenXPKI CA directories..."
+    # UID/GID 100:102 map to openxpki:openxpki inside the server container.
     & docker run --rm `
         -v "$($script:OpenXpkiConfigVolumeName):/config" `
         alpine `
@@ -406,7 +407,7 @@ function Copy-EstCertificatesToOpenXpki {
             chmod 644 /config/ca/${script:OpenXpkiRealm}/${script:OpenXpkiCaName}.crt && \
             cp /config/local/secrets/est-ca.key /config/local/keys/${script:OpenXpkiRealm}/${script:OpenXpkiCaName}.pem && \
             chmod 600 /config/local/keys/${script:OpenXpkiRealm}/${script:OpenXpkiCaName}.pem && \
-            chown -R 1000:1000 /config/local/keys/${script:OpenXpkiRealm} && \
+            chown -R 100:102 /config/local/keys/${script:OpenXpkiRealm} && \
             cp /config/local/secrets/root-ca.crt /config/ca/${script:OpenXpkiRealm}/root.crt && \
             chmod 644 /config/ca/${script:OpenXpkiRealm}/root.crt
         " | Out-Null
