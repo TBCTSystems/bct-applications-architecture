@@ -48,6 +48,10 @@ volumes:
   challenge:
     name: challenge
 
+  # Posh-ACME state persistent data (accounts, orders, certificates)
+  posh-acme-state:
+    name: posh-acme-state
+
   # EST server persistent data (certificates)
   est-data:
     name: est-data
@@ -287,6 +291,8 @@ services:
       - server-certs:/certs/server
       # ACME HTTP-01 challenge directory
       - challenge:/challenge
+      # Posh-ACME state persistent data
+      - posh-acme-state:/posh-acme-state
       # Docker socket access for triggering NGINX reload via docker exec
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -302,6 +308,8 @@ services:
       # Agent operation settings
       CHECK_INTERVAL_SEC: ${CHECK_INTERVAL_SEC:-60}
       LOG_FORMAT: json  # JSON logging for FluentD
+      # Posh-ACME state directory for persistent account and order data
+      POSHACME_HOME: /posh-acme-state
       # Paths for certificate output
       CERT_PATH: /certs/server/cert.pem
       KEY_PATH: /certs/server/key.pem
