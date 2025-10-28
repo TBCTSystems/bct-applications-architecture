@@ -308,6 +308,7 @@ initialize_openxpki() {
 
     # Setup OpenXPKI CA directories
     log_info "Setting up OpenXPKI CA directories..."
+    # UID/GID 100:102 map to openxpki:openxpki inside the OpenXPKI container
     docker run --rm \
         -v "${VOLUME_OPENXPKI_CONFIG}:/config" \
         alpine \
@@ -318,7 +319,7 @@ initialize_openxpki() {
             chmod 644 /config/ca/${OPENXPKI_REALM}/${OPENXPKI_CA_NAME}.crt && \
             cp /config/local/secrets/est-ca.key /config/local/keys/${OPENXPKI_REALM}/${OPENXPKI_CA_NAME}.pem && \
             chmod 600 /config/local/keys/${OPENXPKI_REALM}/${OPENXPKI_CA_NAME}.pem && \
-            chown -R 1000:1000 /config/local/keys/${OPENXPKI_REALM} && \
+            chown -R 100:102 /config/local/keys/${OPENXPKI_REALM} && \
             cp /config/local/secrets/root-ca.crt /config/ca/${OPENXPKI_REALM}/root.crt && \
             chmod 644 /config/ca/${OPENXPKI_REALM}/root.crt
         "
