@@ -23,12 +23,12 @@
 
 #>
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-
 param(
     [switch]$Force
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -307,7 +307,7 @@ function Copy-PkiToVolume {
 
     & docker run --rm `
         -v "$($script:PkiVolumeName):/home/step" `
-        -v "$($sourcePath):/source:ro" `
+        -v "${sourcePath}:/source:ro" `
         smallstep/step-ca:latest `
         sh -c "cp -r /source/* /home/step/ && chown -R step:step /home/step" | Out-Null
 
@@ -369,7 +369,7 @@ function Copy-OpenXpkiBaseConfig {
 
     & docker run --rm `
         -v "$($script:OpenXpkiConfigVolumeName):/config" `
-        -v "$sourcePath:/source:ro" `
+        -v "${sourcePath}:/source:ro" `
         alpine `
         sh -c "cp -r /source/* /config/" | Out-Null
 
