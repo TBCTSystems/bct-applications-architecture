@@ -398,14 +398,15 @@ function Start-AcmeAgent {
                 # PHASE 1: DETECT - Check certificate status
                 Write-LogDebug -Message "Checking certificate status"
 
-                $certStatus = Test-CertificateExists -CertificatePath $config.cert_path
+                $certStatus = Test-CertificateExists -Path $config.cert_path
                 $needsRenewal = $false
 
-                if ($certStatus.Exists) {
+                if ($certStatus) {
                     Write-LogDebug -Message "Certificate exists, checking renewal criteria"
 
                     # Check lifetime percentage
-                    $lifetimePct = Get-CertificateLifetimePercentage -CertificatePath $config.cert_path
+                    $certInfo = Get-CertificateInfo -Path $config.cert_path
+                    $lifetimePct = $certInfo.LifetimeElapsedPercent
                     Write-LogDebug -Message "Certificate lifetime check" -Context @{
                         lifetime_pct = $lifetimePct
                         threshold_pct = $config.renewal_threshold_pct

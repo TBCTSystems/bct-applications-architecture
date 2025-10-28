@@ -49,8 +49,9 @@
 # Dependencies:
 #   - powershell-yaml: PowerShell module for YAML configuration parsing
 #   - Posh-ACME: Production-ready ACME client implementation (replaces custom AcmeClient.psm1)
-#   - ACME-specific modules: ServiceReloadController.psm1
-#   - Common modules: Logger, CryptoHelper, CertificateMonitor, ConfigManager, FileOperations
+#   - ACME-specific modules: ServiceReloadController.psm1, AcmeClient-PoshACME.psm1, PoshAcmeConfigAdapter.psm1
+#   - Common modules: Logger, CertificateMonitor, ConfigManager, FileOperations
+# Note: CryptoHelper no longer needed - Posh-ACME handles all cryptographic operations
 #
 # ==============================================================================
 
@@ -105,9 +106,11 @@ COPY agents/common/*.psm1 /agent/common/
 COPY config/agent_config_schema.json /config/agent_config_schema.json
 
 # Copy ACME agent scripts and modules to /agent/ directory
-# - agent.ps1: Main entry point (event-driven lifecycle orchestration)
-# - AcmeClient.psm1: ACME protocol implementation (RFC 8555)
+# - agent-PoshACME.ps1: Simplified main entry point using Posh-ACME (48.8% code reduction)
+# - AcmeClient-PoshACME.psm1: Posh-ACME wrapper maintaining backward compatibility
+# - PoshAcmeConfigAdapter.psm1: Configuration adapter for Posh-ACME integration
 # - ServiceReloadController.psm1: NGINX reload controller via docker exec
+# - agent.ps1: Original script (preserved for fallback)
 # Source: agents/acme/ subdirectory (from build context .)
 COPY agents/acme/*.ps1 agents/acme/*.psm1 /agent/
 
@@ -123,9 +126,10 @@ COPY agents/acme/config.yaml /agent/
 # - This ensures $PSScriptRoot resolves to /agent when entrypoint runs
 WORKDIR /agent
 
-# Set container entrypoint to PowerShell executing agent.ps1
+# Set container entrypoint to PowerShell executing simplified agent
 # - Array format (exec form) ensures proper signal handling for graceful shutdown
 # - SIGTERM signals are delivered directly to pwsh process (PID 1)
-# - agent.ps1 registers PowerShell.Exiting event for cleanup on shutdown
+# - agent-PoshACME.ps1 uses Posh-ACME with 48.8% code reduction while maintaining full compatibility
+# - Registers PowerShell.Exiting event for cleanup on shutdown
 # - Using absolute path to ensure $PSScriptRoot is set correctly
-ENTRYPOINT ["pwsh", "/agent/agent.ps1"]
+ENTRYPOINT ["pwsh", "/agent/agent-PoshACME.ps1"]

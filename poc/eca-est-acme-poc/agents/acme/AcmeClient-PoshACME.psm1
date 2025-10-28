@@ -550,13 +550,40 @@ function Complete-Http01Challenge {
         $config = @{ pki_url = $BaseUrl }
         Set-PoshAcmeServerFromConfig -Config $config | Out-Null
 
-        # Posh-ACME handles challenges automatically during order processing
-        # This function primarily maintains compatibility
+        # Get current order for challenge processing
         $currentOrder = Get-PAOrder
 
-        if ($currentOrder) {
-            # Submit order which triggers challenge processing
-            $result = Submit-PAOrder
+        if (-not $currentOrder) {
+            throw "No active order found for challenge completion"
+        }
+
+        # Start HTTP-01 challenge listener (Posh-ACME way)
+        Write-LogDebug -Message "Starting HTTP-01 challenge listener"
+
+        # Ensure the challenge directory exists
+        if (-not (Test-Path $ChallengeDirectory)) {
+            New-Item -ItemType Directory -Path $ChallengeDirectory -Force | Out-Null
+        }
+
+        # Start the challenge listener in the background
+        $listenerJob = Start-Job -ScriptBlock {
+            param($OrderName, $ChallengeDir)
+            Import-Module Posh-ACME
+            $order = Get-PAOrder -Name $OrderName
+            Invoke-HttpChallengeListener -PAOrder $order -ChallengeDir $ChallengeDir
+        } -ArgumentList $currentOrder.MainDomain, $ChallengeDirectory
+
+        try {
+            # Submit the challenge response
+            Write-LogDebug -Message "Submitting HTTP-01 challenge response"
+            $result = Complete-PAOrder
+
+            # Wait a moment for the CA to validate
+            Start-Sleep -Seconds 3
+
+            # Stop the listener
+            Stop-Job $listenerJob -ErrorAction SilentlyContinue | Out-Null
+            Remove-Job $listenerJob -ErrorAction SilentlyContinue | Out-Null
 
             # Return structure compatible with original implementation
             return @{
@@ -565,8 +592,12 @@ function Complete-Http01Challenge {
                 Type = "http-01"
                 CompletedAt = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
             }
-        } else {
-            throw "No active order found for challenge completion"
+        }
+        catch {
+            # Ensure listener is stopped on error
+            Stop-Job $listenerJob -ErrorAction SilentlyContinue | Out-Null
+            Remove-Job $listenerJob -ErrorAction SilentlyContinue | Out-Null
+            throw
         }
     }
     catch {
@@ -754,6 +785,38 @@ function Get-AcmeCertificate {
         # Configure Posh-ACME server if not already configured
         $config = @{ pki_url = $BaseUrl }
         Set-PoshAcmeServerFromConfig -Config $config | Out-Null
+
+        # Wait for order to be ready and finalize it
+        $maxWaitTime = 60  # Maximum wait time in seconds
+        $waitInterval = 5   # Check interval in seconds
+        $elapsedTime = 0
+
+        while ($elapsedTime -lt $maxWaitTime) {
+            $currentOrder = Get-PAOrder
+
+            if ($currentOrder.Status -eq 'ready') {
+                Write-LogInfo -Message "Order is ready, finalizing certificate request"
+                Submit-OrderFinalize | Out-Null
+                break
+            }
+            elseif ($currentOrder.Status -eq 'invalid') {
+                throw "Order validation failed"
+            }
+            elseif ($currentOrder.Status -eq 'valid') {
+                Write-LogInfo -Message "Order is valid, retrieving certificate"
+                break
+            }
+
+            Write-LogDebug -Message "Waiting for order validation, current status: $($currentOrder.Status)"
+            Start-Sleep -Seconds $waitInterval
+            $elapsedTime += $waitInterval
+        }
+
+        # Check final order status
+        $finalOrder = Get-PAOrder
+        if ($finalOrder.Status -ne 'valid') {
+            throw "Order did not become valid within timeout period. Final status: $($finalOrder.Status)"
+        }
 
         # Get certificate using Posh-ACME
         $certInfo = Get-PACertificate
