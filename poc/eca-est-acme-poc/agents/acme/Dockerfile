@@ -48,7 +48,8 @@
 #
 # Dependencies:
 #   - powershell-yaml: PowerShell module for YAML configuration parsing
-#   - ACME-specific modules: AcmeClient.psm1, ServiceReloadController.psm1
+#   - Posh-ACME: Production-ready ACME client implementation (replaces custom AcmeClient.psm1)
+#   - ACME-specific modules: ServiceReloadController.psm1
 #   - Common modules: Logger, CryptoHelper, CertificateMonitor, ConfigManager, FileOperations
 #
 # ==============================================================================
@@ -61,11 +62,12 @@
 # The 7.4-alpine-3.20 is the current stable Alpine-based PowerShell 7.4 image.
 FROM mcr.microsoft.com/powershell:7.4-alpine-3.20 AS build
 
-# Install powershell-yaml module required by ConfigManager.psm1
-# - ConfigManager uses ConvertFrom-Yaml cmdlet provided by this module
-# - Install to AllUsers scope for consistent system-wide location
-# - Force flag bypasses confirmation prompts for non-interactive installation
-RUN pwsh -Command "Install-Module -Name powershell-yaml -Force -Scope AllUsers"
+# Install PowerShell modules required by ECA-ACME agent
+# - powershell-yaml: YAML configuration parsing for ConfigManager.psm1
+# - Posh-ACME: Production-ready ACME client implementation (replacing custom AcmeClient.psm1)
+# Install to AllUsers scope for consistent system-wide location
+# Force flag bypasses confirmation prompts for non-interactive installation
+RUN pwsh -Command "Install-Module -Name powershell-yaml,Posh-ACME -Force -Scope AllUsers"
 
 # ==============================================================================
 # Runtime Stage: Minimal production image with agent and dependencies
@@ -78,10 +80,13 @@ FROM mcr.microsoft.com/powershell:7.4-alpine-3.20 AS runtime
 # - OpenSSL: Required by CryptoHelper.psm1 to convert PEM to DER format for certificate parsing
 RUN apk add --no-cache docker-cli openssl
 
-# Copy installed powershell-yaml module from build stage
+# Copy installed PowerShell modules from build stage
 # Source: AllUsers scope installs to /usr/local/share/powershell/Modules/
 # Destination: Same path in runtime image for module auto-discovery
+# - powershell-yaml: YAML configuration parsing
+# - Posh-ACME: Production-ready ACME client implementation
 COPY --from=build /usr/local/share/powershell/Modules/powershell-yaml /usr/local/share/powershell/Modules/powershell-yaml
+COPY --from=build /usr/local/share/powershell/Modules/Posh-ACME /usr/local/share/powershell/Modules/Posh-ACME
 
 # Copy common shared modules to /agent/common/ subdirectory
 # These modules are used by both ACME and EST agents
