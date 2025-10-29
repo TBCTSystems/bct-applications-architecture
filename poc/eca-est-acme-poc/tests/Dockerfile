@@ -19,8 +19,11 @@ RUN apk add --no-cache \
     openssl \
     ca-certificates
 
-# Install Pester module
-RUN pwsh -Command "Install-Module -Name Pester -MinimumVersion 5.0 -Force -Scope AllUsers -AcceptLicense"
+# Install required PowerShell modules (Pester for testing, Posh-ACME + powershell-yaml for agent parity)
+RUN pwsh -Command "\
+    Install-Module -Name Pester -MinimumVersion 5.0 -Force -Scope AllUsers -AcceptLicense; \
+    Install-Module -Name powershell-yaml,Posh-ACME -Force -Scope AllUsers -AcceptLicense \
+"
 
 # Create working directory
 WORKDIR /workspace

@@ -196,7 +196,7 @@ run_integration_tests() {
 
     # Ensure PKI services are running
     print_info "Starting PKI infrastructure..."
-    docker compose up -d pki openxpki-web openxpki-client openxpki-server
+    docker compose up -d pki openxpki-web openxpki-client openxpki-server target-server
 
     # Wait for services to be healthy
     print_info "Waiting for PKI services to be healthy..."

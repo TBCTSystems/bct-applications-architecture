@@ -10,6 +10,93 @@
     "key_path"
   ],
   "properties": {
+    "environment": {
+      "type": "string",
+      "enum": ["development", "staging", "production"],
+      "default": "development",
+      "description": "Deployment environment for the agent. Controls which PKI environment configuration to use and affects logging levels, validation strictness, and security settings. Each environment has its own PKI URL, timeout settings, and SSL certificate validation preferences. This enables the same configuration to be used across different deployment stages with environment-specific behavior.",
+      "examples": ["development", "staging", "production"]
+    },
+    "pki_environments": {
+      "type": "object",
+      "description": "Environment-specific PKI server configurations. Allows the agent to connect to different PKI endpoints based on the selected environment. Each environment can have its own URL, timeout settings, and SSL validation requirements. This supports development, staging, and production workflows with different certificate authorities or configurations.",
+      "properties": {
+        "development": {
+          "type": "object",
+          "description": "Development environment PKI configuration with relaxed validation and shorter timeouts for local testing.",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "PKI server URL for development environment"
+            },
+            "skip_certificate_check": {
+              "type": "boolean",
+              "default": true,
+              "description": "Skip SSL certificate validation for development (allows self-signed certificates)"
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 30,
+              "description": "Request timeout in seconds for development environment"
+            }
+          },
+          "required": ["url"],
+          "additionalProperties": false
+        },
+        "staging": {
+          "type": "object",
+          "description": "Staging environment PKI configuration with production-like settings for pre-deployment testing.",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "PKI server URL for staging environment"
+            },
+            "skip_certificate_check": {
+              "type": "boolean",
+              "default": false,
+              "description": "Skip SSL certificate validation for staging environment"
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 60,
+              "description": "Request timeout in seconds for staging environment"
+            }
+          },
+          "required": ["url"],
+          "additionalProperties": false
+        },
+        "production": {
+          "type": "object",
+          "description": "Production environment PKI configuration with strict validation and longer timeouts.",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "PKI server URL for production environment"
+            },
+            "skip_certificate_check": {
+              "type": "boolean",
+              "default": false,
+              "description": "Skip SSL certificate validation for production environment (should remain false)"
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 120,
+              "description": "Request timeout in seconds for production environment"
+            }
+          },
+          "required": ["url"],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
     "pki_url": {
       "type": "string",
       "format": "uri",
@@ -157,6 +244,88 @@
           "type": "boolean",
           "default": true,
           "description": "Check certificate revocation status before attempting renewal. If the certificate is revoked, force immediate renewal."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "certificate_chain": {
+      "type": "object",
+      "description": "Certificate chain management configuration. Controls how the agent handles certificate chains including intermediate certificates, validation settings, and file output options. This enables proper chain management for compliance and security requirements.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable full certificate chain handling including leaf, intermediate, and root certificates. When disabled, only the leaf certificate is managed."
+        },
+        "full_chain_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute file system path where the complete certificate chain (leaf + intermediates + root) will be written. This is useful for applications that require the full chain for proper TLS validation."
+        },
+        "intermediates_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute file system path where only intermediate certificates will be written. Useful for applications that handle leaf certificates separately from intermediates."
+        },
+        "validation": {
+          "type": "object",
+          "description": "Certificate chain validation settings. Controls how thoroughly the agent validates the certificate chain before installation.",
+          "properties": {
+            "validate_completeness": {
+              "type": "boolean",
+              "default": true,
+              "description": "Validate that the certificate chain is complete before installation. Ensures all necessary intermediate certificates are present."
+            },
+            "verify_signatures": {
+              "type": "boolean",
+              "default": true,
+              "description": "Verify that all certificate signatures in the chain are cryptographically valid."
+            },
+            "check_expiry": {
+              "type": "boolean",
+              "default": true,
+              "description": "Check expiration dates for all certificates in the chain to ensure none have expired."
+            },
+            "max_depth": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 5,
+              "description": "Maximum allowed certificate chain depth. Prevents certificate chain loops and excessive chain lengths."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "installation": {
+          "type": "object",
+          "description": "Certificate chain installation preferences. Controls how certificates are written to disk and which formats are created.",
+          "properties": {
+            "install_full_chain_to_cert_path": {
+              "type": "boolean",
+              "default": true,
+              "description": "Install the full certificate chain to the main cert_path. Recommended for most modern applications including NGINX."
+            },
+            "install_leaf_only": {
+              "type": "boolean",
+              "default": false,
+              "description": "Install only the leaf certificate to cert_path. For legacy applications that cannot handle certificate chains."
+            },
+            "create_separate_chain_files": {
+              "type": "boolean",
+              "default": true,
+              "description": "Create separate files for full chain and intermediates in addition to the main certificate file."
+            },
+            "chain_file_permissions": {
+              "type": "string",
+              "pattern": "^[0-7]{3,4}$",
+              "default": "0644",
+              "description": "File permissions (octal) for certificate chain files. Should be readable by applications but not writable by others."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
         }
       },
       "required": [],

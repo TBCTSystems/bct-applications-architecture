@@ -80,7 +80,7 @@ Step-CA supports ACME provisioners that are compatible with standard ACME client
 
 | Variable | Purpose | Our Integration |
 |----------|---------|-----------------|
-| `POSHACME_HOME` | Custom state directory | Set to `/config/poshacme` |
+| `POSHACME_HOME` | Custom state directory | Preferred. Typically `/posh-acme-state` via container env, falls back to `/config/poshacme` |
 | `POSHACME_PLUGINS` | Custom plugins | Future DNS-01 support |
 | `POSHACME_SHOW_PROGRESS` | Progress display | Enable for debugging |
 | `POSHACME_VAULT_NAME` | SecretManagement integration | Future enhancement |

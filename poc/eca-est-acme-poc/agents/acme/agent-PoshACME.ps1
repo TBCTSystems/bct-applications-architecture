@@ -88,10 +88,17 @@ Import-Module (Join-Path $script:CommonModuleDirectory 'Logger.psm1') -Force -Gl
 Import-Module (Join-Path $script:CommonModuleDirectory 'ConfigManager.psm1') -Force -Global
 Import-Module (Join-Path $script:CommonModuleDirectory 'CertificateMonitor.psm1') -Force -Global
 Import-Module (Join-Path $script:CommonModuleDirectory 'FileOperations.psm1') -Force -Global
+Import-Module (Join-Path $script:CommonModuleDirectory 'CrlValidator.psm1') -Force -Global
 
-# Import Posh-ACME wrapper and adapter
-Import-Module (Join-Path $PSScriptRoot 'AcmeClient-PoshACME.psm1') -Force -Global
-Import-Module (Join-Path $PSScriptRoot 'PoshAcmeConfigAdapter.psm1') -Force -Global
+# Import Posh-ACME module directly
+try {
+    Import-Module Posh-ACME -Force -Global
+} catch {
+    Write-Host "[ERROR] Failed to import Posh-ACME module: $($_.Exception.Message)" -ForegroundColor Red
+    throw "Posh-ACME module is required. Install with: Install-Module -Name Posh-ACME"
+}
+
+# Import ServiceReloadController for NGINX reload
 Import-Module (Join-Path $PSScriptRoot 'ServiceReloadController.psm1') -Force -Global
 
 # ============================================================================
@@ -139,17 +146,174 @@ function global:Write-LogError { param([Parameter(Mandatory=$true)][string]$Mess
 function global:Write-LogDebug { param([Parameter(Mandatory=$true)][string]$Message, [hashtable]$Context = @{}) Write-LogEntry -Severity 'DEBUG' -Message $Message -Context $Context }
 
 # ============================================================================
-# MAIN FUNCTIONS (SIMPLIFIED)
+# POSH-ACME HELPER FUNCTIONS
+# ============================================================================
+
+function Get-AcmeDirectoryUrl {
+    <#
+    .SYNOPSIS
+        Construct ACME directory URL from base PKI URL.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][string]$PkiUrl)
+
+    $cleanUrl = $PkiUrl.TrimEnd('/')
+    return "${cleanUrl}/acme/acme/directory"
+}
+
+function Initialize-PoshAcmeEnvironment {
+    <#
+    .SYNOPSIS
+        Initialize Posh-ACME environment (state directory and server configuration).
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][hashtable]$Config)
+
+    try {
+        # Set up Posh-ACME state directory
+        $stateDir = $env:POSHACME_HOME
+        if ([string]::IsNullOrWhiteSpace($stateDir)) {
+            $stateDir = "/config/poshacme"
+            $env:POSHACME_HOME = $stateDir
+        }
+
+        if (-not (Test-Path -Path $stateDir)) {
+            Write-LogInfo -Message "Creating Posh-ACME state directory" -Context @{ state_dir = $stateDir }
+            New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+
+            try {
+                Set-FilePermissions -Path $stateDir -Mode "0700"
+            } catch {
+                Write-LogDebug -Message "Unable to set permissions on state directory (non-fatal)" -Context @{
+                    state_dir = $stateDir
+                    error = $_.Exception.Message
+                }
+            }
+        }
+
+        # Configure Posh-ACME server
+        $directoryUrl = Get-AcmeDirectoryUrl -PkiUrl $Config.pki_url
+
+        Write-LogInfo -Message "Configuring Posh-ACME server" -Context @{
+            directory_url = $directoryUrl
+            environment = $Config.environment
+        }
+
+        $serverArgs = @{ DirectoryUrl = $directoryUrl }
+
+        # Skip certificate check for development/self-signed certificates
+        if ($Config.environment -eq 'development' -or $Config.ContainsKey('skip_certificate_check') -and $Config.skip_certificate_check) {
+            $serverArgs.Add("SkipCertificateCheck", $true)
+        }
+
+        Set-PAServer @serverArgs
+
+        Write-LogInfo -Message "Posh-ACME environment initialized" -Context @{
+            state_dir = $stateDir
+            directory_url = $directoryUrl
+        }
+
+        return $true
+    }
+    catch {
+        Write-LogError -Message "Failed to initialize Posh-ACME environment" -Context @{
+            error = $_.Exception.Message
+            pki_url = $Config.pki_url
+        }
+        throw
+    }
+}
+
+function Save-CertificateFiles {
+    <#
+    .SYNOPSIS
+        Save certificate and key files from Posh-ACME to configured paths.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]$PACertificate,
+        [Parameter(Mandatory = $true)][hashtable]$Config
+    )
+
+    try {
+        Write-LogInfo -Message "Saving certificate and key files" -Context @{
+            cert_path = $Config.cert_path
+            key_path = $Config.key_path
+        }
+
+        # Read certificate and key content from Posh-ACME files
+        $certContent = Get-Content -LiteralPath $PACertificate.CertFile -Raw
+        $keyContent = Get-Content -LiteralPath $PACertificate.KeyFile -Raw
+
+        # Determine which certificate content to save based on chain configuration
+        $mainCertContent = $certContent
+        if ($Config.ContainsKey('certificate_chain') -and $Config.certificate_chain.enabled) {
+            if ($Config.certificate_chain.installation.install_full_chain_to_cert_path) {
+                $mainCertContent = Get-Content -LiteralPath $PACertificate.FullChainFile -Raw
+                Write-LogDebug -Message "Using full chain for main certificate file"
+            }
+        }
+
+        # Save private key
+        Write-FileAtomic -Path $Config.key_path -Content $keyContent
+        Set-FilePermissions -Path $Config.key_path -Mode "0600"
+
+        # Save certificate
+        Write-FileAtomic -Path $Config.cert_path -Content $mainCertContent
+        Set-FilePermissions -Path $Config.cert_path -Mode "0644"
+
+        # Save additional chain files if configured
+        if ($Config.ContainsKey('certificate_chain') -and $Config.certificate_chain.enabled -and
+            $Config.certificate_chain.installation.create_separate_chain_files) {
+
+            if ($Config.certificate_chain.full_chain_path) {
+                $fullChainContent = Get-Content -LiteralPath $PACertificate.FullChainFile -Raw
+                Write-FileAtomic -Path $Config.certificate_chain.full_chain_path -Content $fullChainContent
+                Set-FilePermissions -Path $Config.certificate_chain.full_chain_path -Mode "0644"
+                Write-LogDebug -Message "Saved full chain file" -Context @{
+                    path = $Config.certificate_chain.full_chain_path
+                }
+            }
+
+            if ($Config.certificate_chain.intermediates_path -and (Test-Path $PACertificate.ChainFile)) {
+                $chainContent = Get-Content -LiteralPath $PACertificate.ChainFile -Raw
+                Write-FileAtomic -Path $Config.certificate_chain.intermediates_path -Content $chainContent
+                Set-FilePermissions -Path $Config.certificate_chain.intermediates_path -Mode "0644"
+                Write-LogDebug -Message "Saved intermediates file" -Context @{
+                    path = $Config.certificate_chain.intermediates_path
+                }
+            }
+        }
+
+        Write-LogInfo -Message "Certificate and key files saved successfully" -Context @{
+            cert_path = $Config.cert_path
+            key_path = $Config.key_path
+        }
+
+        return $true
+    }
+    catch {
+        Write-LogError -Message "Failed to save certificate files" -Context @{
+            error = $_.Exception.Message
+            cert_path = $Config.cert_path
+            key_path = $Config.key_path
+        }
+        return $false
+    }
+}
+
+# ============================================================================
+# MAIN FUNCTIONS (NATIVE POSH-ACME)
 # ============================================================================
 
 function Initialize-AcmeAccount {
     <#
     .SYNOPSIS
-        Initialize ACME account using Posh-ACME wrapper.
+        Initialize ACME account using native Posh-ACME cmdlets.
 
     .DESCRIPTION
-        Simplified account initialization that uses the Posh-ACME wrapper
-        instead of the complex custom implementation.
+        Initializes Posh-ACME environment and creates or retrieves an ACME account
+        using native Posh-ACME functions without any wrapper layers.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -163,18 +327,55 @@ function Initialize-AcmeAccount {
             pki_url = $Config.pki_url
         }
 
-        # Configure Posh-ACME server
-        Set-PoshAcmeServerFromConfig -Config $Config | Out-Null
+        # Initialize Posh-ACME environment (state directory + server config)
+        Initialize-PoshAcmeEnvironment -Config $Config | Out-Null
 
-        # Initialize account using Posh-ACME wrapper
-        $account = Initialize-PoshAcmeAccountFromConfig -Config $Config
+        # Try to get existing account
+        $account = Get-PAAccount
 
-        Write-LogInfo -Message "ACME account initialized successfully" -Context @{
-            account_id = $account.ID
-            status = $account.Status
+        if ($account -and $account.status -eq 'valid') {
+            Write-LogInfo -Message "Using existing Posh-ACME account" -Context @{
+                account_id = $account.ID
+                status = $account.status
+            }
+
+            try {
+                Set-PAAccount -ID $account.ID | Out-Null
+            } catch {
+                Write-LogDebug -Message "Failed to set active account (non-fatal)" -Context @{
+                    error = $_.Exception.Message
+                }
+            }
+
+            return @{
+                ID = $account.ID
+                Status = $account.status
+                Account = $account
+            }
         }
 
-        return $account
+        # Create new account if none exists
+        Write-LogInfo -Message "Creating new Posh-ACME account"
+        $newAccount = New-PAAccount -AcceptTOS
+
+        Write-LogInfo -Message "ACME account created successfully" -Context @{
+            account_id = $newAccount.ID
+            status = $newAccount.status
+        }
+
+        try {
+            Set-PAAccount -ID $newAccount.ID | Out-Null
+        } catch {
+            Write-LogDebug -Message "Failed to set active account (non-fatal)" -Context @{
+                error = $_.Exception.Message
+            }
+        }
+
+        return @{
+            ID = $newAccount.ID
+            Status = $newAccount.status
+            Account = $newAccount
+        }
     }
     catch {
         Write-LogError -Message "ACME account initialization failed" -Context @{
@@ -188,61 +389,143 @@ function Initialize-AcmeAccount {
 function Test-CertificateAgainstCrl {
     <#
     .SYNOPSIS
-        Test certificate against CRL (maintained from original).
+        Validate certificate status against configured CRL cache.
 
     .DESCRIPTION
-        This function is preserved from the original implementation
-        to maintain CRL validation capabilities.
+        Mirrors the legacy agent CRL handling by updating the cached CRL,
+        validating certificate revocation status, and returning detailed
+        results that downstream logic can inspect.
     #>
     [CmdletBinding()]
-    [OutputType([bool])]
+    [OutputType([hashtable])]
     param(
         [Parameter(Mandatory = $true)]
-        [hashtable]$Config
+        [hashtable]$Config,
+
+        [Parameter(Mandatory = $false)]
+        [string]$CertPath
     )
 
-    # Preserve original CRL validation logic
-    if (-not $Config.crl.enabled) {
-        Write-LogDebug -Message "CRL validation disabled"
-        return $true
+    $result = @{
+        CrlEnabled   = $false
+        CrlChecked   = $false
+        Revoked      = $false
+        CrlAge       = -1.0
+        RevokedCount = 0
+        Error        = $null
     }
 
     try {
-        Write-LogDebug -Message "Testing certificate against CRL" -Context @{
-            crl_url = $Config.crl.url
+        if ((-not $Config.ContainsKey('crl')) -or (-not $Config.crl.enabled)) {
+            Write-LogDebug -Message "CRL validation disabled in configuration"
+            return $result
         }
 
-        # CRL validation logic from original implementation
-        # (This would be the same as the original function)
-        # For now, assume certificate is valid
-        return $true
+        $result.CrlEnabled = $true
+
+        if (-not $CertPath) {
+            $CertPath = $Config.cert_path
+        }
+
+        if ([string]::IsNullOrWhiteSpace($Config.crl.url) -or
+            [string]::IsNullOrWhiteSpace($Config.crl.cache_path)) {
+            Write-LogWarn -Message "CRL enabled but url/cache_path not configured"
+            return $result
+        }
+
+        $maxAge = if ($Config.crl.max_age_hours) {
+            [double]$Config.crl.max_age_hours
+        } else {
+            24.0
+        }
+
+        $updateResult = Update-CrlCache `
+            -Url $Config.crl.url `
+            -CachePath $Config.crl.cache_path `
+            -MaxAgeHours $maxAge
+
+        $result.CrlAge = $updateResult.CrlAge
+        $result.RevokedCount = $updateResult.RevokedCount
+
+        if ($null -ne $updateResult.Error) {
+            Write-LogWarn -Message "CRL cache update returned error" -Context @{
+                error      = $updateResult.Error
+                cache_path = $Config.crl.cache_path
+            }
+            $result.Error = $updateResult.Error
+            return $result
+        }
+
+        Write-LogInfo -Message "CRL cache refreshed" -Context @{
+            crl_age_hours   = [math]::Round($updateResult.CrlAge, 2)
+            revoked_entries = $updateResult.RevokedCount
+            downloaded      = $updateResult.Downloaded
+        }
+
+        if ([string]::IsNullOrWhiteSpace($CertPath) -or -not (Test-Path -Path $CertPath)) {
+            Write-LogDebug -Message "Certificate path missing, skipping CRL validation" -Context @{
+                cert_path = $CertPath
+            }
+            return $result
+        }
+
+        $revoked = Test-CertificateRevoked `
+            -CertificatePath $CertPath `
+            -CrlPath $Config.crl.cache_path
+
+        $result.CrlChecked = $true
+
+        if ($null -eq $revoked) {
+            Write-LogWarn -Message "CRL validation inconclusive" -Context @{
+                cert_path = $CertPath
+            }
+            $result.Error = "CRL validation inconclusive"
+            return $result
+        }
+
+        $result.Revoked = [bool]$revoked
+
+        if ($result.Revoked) {
+            Write-LogWarn -Message "Certificate is revoked according to CRL" -Context @{
+                cert_path = $CertPath
+            }
+        } else {
+            Write-LogInfo -Message "Certificate is valid according to CRL" -Context @{
+                cert_path = $CertPath
+            }
+        }
+
+        return $result
     }
     catch {
-        Write-LogWarn -Message "CRL validation failed, assuming certificate is valid" -Context @{
-            error = $_.Exception.Message
+        Write-LogError -Message "CRL validation threw exception" -Context @{
+            error     = $_.Exception.Message
+            cert_path = $CertPath
         }
-        return $true
+        $result.Error = $_.Exception.Message
+        return $result
     }
 }
 
 function Invoke-CertificateRenewal {
     <#
     .SYNOPSIS
-        Execute simplified ACME certificate renewal workflow using Posh-ACME.
+        Execute ACME certificate renewal workflow using native Posh-ACME cmdlets.
 
     .DESCRIPTION
-        Dramatically simplified renewal workflow that uses Posh-ACME wrapper
-        functions instead of the complex 12-step manual process.
+        Certificate renewal workflow using pure Posh-ACME without wrapper/adapter layers.
 
-        Simplified steps:
-        1. Create ACME order using Posh-ACME wrapper
-        2. Complete challenge (automatic in Posh-ACME)
-        3. Get certificate using Posh-ACME wrapper
-        4. Save certificate and key using configuration adapter
-        5. Reload NGINX service
+        Native Posh-ACME workflow:
+        1. Create order with New-PAOrder
+        2. Handle HTTP-01 challenge (publish token, send acknowledgement)
+        3. Poll for challenge validation
+        4. Finalize order with Submit-OrderFinalize
+        5. Complete order with Complete-PAOrder
+        6. Save certificate and key files
+        7. Reload NGINX service
 
     .PARAMETER Config
-        Configuration hashtable from Get-AgentConfiguration.
+        Configuration hashtable from Read-AgentConfig.
 
     .OUTPUTS
         System.Boolean - $true if renewal succeeded, $false otherwise.
@@ -254,67 +537,143 @@ function Invoke-CertificateRenewal {
         [hashtable]$Config
     )
 
+    $publishedChallenges = @()
+
     try {
         Write-LogInfo -Message "Certificate renewal started" -Context @{
             domain = $Config.domain_name
             pki_url = $Config.pki_url
         }
 
-        # STEP 1: Create ACME order using Posh-ACME wrapper (dramatically simplified)
-        Write-LogDebug -Message "Creating ACME order using Posh-ACME" -Context @{
+        # STEP 1: Create ACME order using native Posh-ACME
+        Write-LogDebug -Message "Creating ACME order" -Context @{
             domain_name = $Config.domain_name
         }
 
-        $order = New-AcmeOrder -BaseUrl $Config.pki_url -DomainName $Config.domain_name
+        $order = New-PAOrder -Domain $Config.domain_name -Force
 
-        Write-LogInfo -Message "ACME order created successfully" -Context @{
-            order_id = $order.ID
-            status = $order.Status
+        Write-LogInfo -Message "ACME order created" -Context @{
+            main_domain = $order.MainDomain
+            status = $order.status
         }
 
-        # STEP 2: Complete HTTP-01 challenge (automatic in Posh-ACME)
-        Write-LogDebug -Message "Completing HTTP-01 challenge (automatic in Posh-ACME)"
+        # Set this as the active order
+        Set-PAOrder -MainDomain $Config.domain_name | Out-Null
 
-        $challengeResult = Complete-Http01Challenge -BaseUrl $Config.pki_url -Authorization $order -ChallengeDirectory "/challenge"
+        # STEP 2: Complete HTTP-01 challenge
+        Write-LogDebug -Message "Handling HTTP-01 challenge"
 
-        if ($challengeResult) {
-            Write-LogInfo -Message "HTTP-01 challenge completed successfully"
-        } else {
-            throw "HTTP-01 challenge completion failed"
+        $challengeDir = "/challenge"
+        $challengeRoot = Join-Path -Path $challengeDir -ChildPath ".well-known/acme-challenge"
+
+        if (-not (Test-Path -Path $challengeRoot)) {
+            New-Item -ItemType Directory -Path $challengeRoot -Force | Out-Null
         }
 
-        # STEP 3: Wait for challenge validation (simplified)
-        Write-LogDebug -Message "Waiting for challenge validation"
-        Start-Sleep -Seconds 5  # Brief wait for Posh-ACME to process
+        foreach ($authUrl in $order.authorizations) {
+            $authorization = Get-PAAuthorization -AuthURLs $authUrl
 
-        # STEP 4: Finalize order and get certificate (dramatically simplified)
-        Write-LogDebug -Message "Finalizing order and retrieving certificate"
-
-        $certificateResult = Get-AcmeCertificate -BaseUrl $Config.pki_url -Order $order
-
-        if ($certificateResult) {
-            Write-LogInfo -Message "Certificate retrieved successfully" -Context @{
-                certificate_path = $Config.cert_path
+            if ($authorization.status -eq 'valid') {
+                Write-LogDebug -Message "Authorization already valid" -Context @{
+                    identifier = $authorization.identifier.value
+                }
+                continue
             }
-        } else {
-            throw "Certificate retrieval failed"
-        }
 
-        # STEP 5: Save certificate and key using configuration adapter
-        Write-LogDebug -Message "Saving certificate and key to configured paths"
-
-        $saveResult = Save-PoshAcmeCertificate -Order $order -Config $Config
-
-        if ($saveResult) {
-            Write-LogInfo -Message "Certificate and key saved successfully" -Context @{
-                cert_path = $Config.cert_path
-                key_path = $Config.key_path
+            $httpChallenge = $authorization.challenges | Where-Object { $_.type -eq 'http-01' }
+            if (-not $httpChallenge) {
+                throw "HTTP-01 challenge not available for $($authorization.identifier.value)"
             }
-        } else {
-            throw "Certificate and key save failed"
+
+            # Get key authorization and publish it
+            $keyAuth = Get-KeyAuthorization -Token $httpChallenge.token
+            $tokenPath = Join-Path -Path $challengeRoot -ChildPath $httpChallenge.token
+
+            Write-LogDebug -Message "Publishing HTTP-01 challenge token" -Context @{
+                token = $httpChallenge.token
+                path = $tokenPath
+            }
+
+            Write-FileAtomic -Path $tokenPath -Content $keyAuth
+            Set-FilePermissions -Path $tokenPath -Mode "0644"
+
+            # Send challenge acknowledgement
+            Send-ChallengeAck -ChallengeUrl $httpChallenge.url | Out-Null
+
+            $publishedChallenges += @{ Path = $tokenPath }
         }
 
-        # STEP 6: Reload NGINX service (preserved from original)
+        # STEP 3: Poll for challenge validation
+        Write-LogDebug -Message "Polling for challenge validation"
+
+        $validationTimeout = 120
+        $pollInterval = 2
+        $deadline = (Get-Date).AddSeconds($validationTimeout)
+
+        while ((Get-Date) -lt $deadline) {
+            $currentOrder = Get-PAOrder -MainDomain $Config.domain_name -Refresh
+
+            if ($currentOrder.status -eq 'valid') {
+                Write-LogInfo -Message "Challenge validated successfully"
+                break
+            }
+            elseif ($currentOrder.status -eq 'ready') {
+                Write-LogInfo -Message "Order ready for finalization"
+                break
+            }
+            elseif ($currentOrder.status -eq 'invalid') {
+                throw "Challenge validation failed (order status invalid)"
+            }
+
+            Start-Sleep -Seconds $pollInterval
+        }
+
+        # STEP 4: Finalize order
+        $finalOrder = Get-PAOrder -MainDomain $Config.domain_name -Refresh
+
+        if ($finalOrder.status -eq 'ready') {
+            Write-LogInfo -Message "Finalizing order"
+            Submit-OrderFinalize | Out-Null
+
+            # Poll for finalization completion
+            $deadline = (Get-Date).AddSeconds(60)
+            while ((Get-Date) -lt $deadline) {
+                $finalOrder = Get-PAOrder -MainDomain $Config.domain_name -Refresh
+                if ($finalOrder.status -eq 'valid') {
+                    break
+                }
+                Start-Sleep -Seconds 2
+            }
+        }
+
+        if ($finalOrder.status -ne 'valid') {
+            throw "Order did not become valid. Final status: $($finalOrder.status)"
+        }
+
+        # STEP 5: Complete order and get certificate
+        Write-LogInfo -Message "Completing order and retrieving certificate"
+
+        $paCertificate = Complete-PAOrder -Order $finalOrder
+
+        if (-not $paCertificate) {
+            throw "Certificate not available after order completion"
+        }
+
+        Write-LogInfo -Message "Certificate issued successfully" -Context @{
+            subject = $paCertificate.Subject
+            not_after = $paCertificate.NotAfter
+        }
+
+        # STEP 6: Save certificate and key files
+        Write-LogDebug -Message "Saving certificate and key files"
+
+        $saveResult = Save-CertificateFiles -PACertificate $paCertificate -Config $Config
+
+        if (-not $saveResult) {
+            throw "Failed to save certificate files"
+        }
+
+        # STEP 7: Reload NGINX service
         Write-LogDebug -Message "Reloading NGINX service"
 
         $reloadResult = Invoke-NginxReload
@@ -339,6 +698,31 @@ function Invoke-CertificateRenewal {
             stack_trace = $_.ScriptStackTrace
         }
         return $false
+    }
+    finally {
+        # Cleanup challenge files
+        $keepChallenges = $env:POSHACME_KEEP_CHALLENGE_FILES -eq '1'
+
+        foreach ($challenge in $publishedChallenges) {
+            if ($keepChallenges) {
+                Write-LogDebug -Message "Preserving challenge file for debugging" -Context @{
+                    path = $challenge.Path
+                }
+                continue
+            }
+
+            try {
+                if (Test-Path $challenge.Path) {
+                    Remove-Item -Path $challenge.Path -Force -ErrorAction Stop
+                }
+            }
+            catch {
+                Write-LogDebug -Message "Failed to remove challenge file (non-fatal)" -Context @{
+                    path = $challenge.Path
+                    error = $_.Exception.Message
+                }
+            }
+        }
     }
 }
 
@@ -422,10 +806,19 @@ function Start-AcmeAgent {
 
                     # Check CRL if enabled
                     if ($config.crl.enabled -and $config.crl.check_before_renewal) {
-                        $crlValid = Test-CertificateAgainstCrl -Config $config
-                        if (-not $crlValid) {
+                        $crlResult = Test-CertificateAgainstCrl -Config $config -CertPath $config.cert_path
+
+                        if ($crlResult.Error) {
+                            Write-LogWarn -Message "CRL validation reported a warning" -Context @{
+                                error = $crlResult.Error
+                            }
+                        }
+
+                        if ($crlResult.CrlEnabled -and $crlResult.CrlChecked -and $crlResult.Revoked) {
                             $needsRenewal = $true
-                            Write-LogInfo -Message "Renewal triggered by CRL validation failure"
+                            Write-LogWarn -Message "Renewal triggered by CRL revocation status" -Context @{
+                                crl_age_hours = $crlResult.CrlAge
+                            }
                         }
                     }
                 } else {

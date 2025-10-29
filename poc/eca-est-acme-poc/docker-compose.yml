@@ -298,6 +298,8 @@ services:
     environment:
       AGENT_NAME: ${ACME_AGENT_NAME:-acme}
       AGENT_ENV_PREFIX: ${ACME_AGENT_PREFIX:-ACME_}
+      # Environment configuration (development, staging, production)
+      ACME_ENVIRONMENT: ${ACME_ENVIRONMENT:-development}
       # PKI service endpoint
       PKI_URL: ${PKI_URL:-https://pki:9000}
       # Domain name for certificate Subject Alternative Name (SAN)
@@ -515,12 +517,17 @@ services:
       - ./tests:/workspace/tests:ro
       # Mount scripts
       - ./scripts:/workspace/scripts:ro
+      # Share challenge volume and certificate/state directories
+      - challenge:/challenge
+      - server-certs:/certs/server
+      - posh-acme-state:/posh-acme-state
     environment:
       # Test configuration
       PKI_URL: ${PKI_URL:-https://pki:9000}
       EST_URL: ${EST_URL:-https://openxpki-web:443}
       # Disable coverage by default (can override)
       GENERATE_COVERAGE: ${GENERATE_COVERAGE:-false}
+      POSHACME_HOME: /posh-acme-state
     # Override default command for flexibility
     # Default: Run all tests
     # Override with: docker compose run --rm test-runner pwsh -Command "Invoke-Pester -Path ./tests/unit"

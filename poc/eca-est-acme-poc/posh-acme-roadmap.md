@@ -21,11 +21,11 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-## Epic 1: Foundation and Setup
+## [x] Epic 1: Foundation and Setup
 **Sprint Goal**: Establish Posh-ACME foundation while maintaining system functionality
 **Duration**: 1 week
 
-### Story 1.1: Research and Environment Setup
+### [x] Story 1.1: Research and Environment Setup
 **As a** developer
 **I want to** understand Posh-ACME installation requirements and integration patterns
 **So that** I can plan the migration effectively
@@ -37,17 +37,17 @@ This document outlines the comprehensive migration plan for replacing our custom
 - Version compatibility validated with PowerShell 7.4
 
 **Tasks:**
-- [ ] Install Posh-ACME in development environment
-- [ ] Review Posh-ACME documentation for step-ca compatibility
-- [ ] Test basic Posh-ACME cmdlets with step-ca endpoint
-- [ ] Document Posh-ACME configuration requirements
-- [ ] Validate Posh-ACME version compatibility with PowerShell 7.4
+- [x] Install Posh-ACME in development environment
+- [x] Review Posh-ACME documentation for step-ca compatibility
+- [x] Test basic Posh-ACME cmdlets with step-ca endpoint
+- [x] Document Posh-ACME configuration requirements
+- [x] Validate Posh-ACME version compatibility with PowerShell 7.4
 
 **Definition of Done**: All tasks completed, Posh-ACME working locally with step-ca
 
 ---
 
-### Story 1.2: Docker Infrastructure Update
+### [x] Story 1.2: Docker Infrastructure Update
 **As a** developer
 **I want to** update Docker build process to include Posh-ACME
 **So that** the containerized environment has the required dependencies
@@ -59,17 +59,17 @@ This document outlines the comprehensive migration plan for replacing our custom
 - Docker build optimized with multi-stage patterns
 
 **Tasks:**
-- [ ] Update `agents/acme/Dockerfile` to install Posh-ACME from PowerShell Gallery
-- [ ] Verify Docker build optimization with multi-stage patterns
-- [ ] Test Docker build with Posh-ACME dependencies
-- [ ] Update docker-compose.yml if additional build context required
-- [ ] Validate container image size remains reasonable
+- [x] Update `agents/acme/Dockerfile` to install Posh-ACME from PowerShell Gallery
+- [x] Verify Docker build optimization with multi-stage patterns
+- [x] Test Docker build with Posh-ACME dependencies
+- [x] Update docker-compose.yml if additional build context required
+- [x] Validate container image size remains reasonable
 
 **Definition of Done**: Container builds successfully with Posh-ACME, all tests pass
 
 ---
 
-### Story 1.3: Configuration Adapter Design
+### [x] Story 1.3: Configuration Adapter Design
 **As a** developer
 **I want to** create a configuration adapter that maps our existing YAML to Posh-ACME parameters
 **So that** existing configuration interface remains unchanged
@@ -81,21 +81,21 @@ This document outlines the comprehensive migration plan for replacing our custom
 - Backward compatibility validated
 
 **Tasks:**
-- [ ] Analyze current `agents/acme/config.yaml` structure
-- [ ] Map configuration fields to Posh-ACME cmdlet parameters
-- [ ] Design `PoshAcmeConfigAdapter.psm1` module
-- [ ] Implement environment variable override mapping
-- [ ] Validate backward compatibility of configuration interface
+- [x] Analyze current `agents/acme/config.yaml` structure
+- [x] Map configuration fields to Posh-ACME cmdlet parameters
+- [x] Design `PoshAcmeConfigAdapter.psm1` module
+- [x] Implement environment variable override mapping
+- [x] Validate backward compatibility of configuration interface
 
 **Definition of Done**: Configuration adapter working, all existing config patterns preserved
 
 ---
 
-## Epic 2: Core ACME Implementation Refactor
+## [ ] Epic 2: Core ACME Implementation Refactor
 **Sprint Goal**: Replace custom ACME implementation with Posh-ACME while preserving functionality
 **Duration**: 1 week
 
-### Story 2.1: ACME Client Module Replacement
+### [ ] Story 2.1: ACME Client Module Replacement
 **As a** developer
 **I want to** replace custom AcmeClient.psm1 with Posh-ACME cmdlets
 **So that** we leverage battle-tested ACME protocol implementation
@@ -107,22 +107,22 @@ This document outlines the comprehensive migration plan for replacing our custom
 - No functionality loss in ACME operations
 
 **Tasks:**
-- [ ] Analyze current `AcmeClient.psm1` public interface
-- [ ] Map custom functions to Posh-ACME equivalents:
-  - [ ] `Get-AcmeDirectory` → `Get-PAAccount`
-  - [ ] `New-AcmeAccount` → `New-PAAccount`
-  - [ ] `New-AcmeOrder` → `New-PAOrder`
-  - [ ] `Complete-Http01Challenge` → `Complete-PAChallenge`
-  - [ ] `Complete-AcmeOrder` → `Submit-PAOrder`
-  - [ ] `Get-AcmeCertificate` → `New-PACertificate`
-- [ ] Create wrapper functions for backward compatibility
+- [x] Analyze current `AcmeClient.psm1` public interface
+- [x] Map custom functions to Posh-ACME equivalents:
+  - [x] `Get-AcmeDirectory` → `Get-PAAccount`
+  - [x] `New-AcmeAccount` → `New-PAAccount`
+  - [x] `New-AcmeOrder` → `New-PAOrder`
+  - [x] `Complete-Http01Challenge` → `Complete-PAChallenge`
+  - [x] `Complete-AcmeOrder` → `Submit-PAOrder`
+  - [x] `Get-AcmeCertificate` → `New-PACertificate`
+- [x] Create wrapper functions for backward compatibility
 - [ ] Remove custom ACME protocol implementation (~500 lines)
 
 **Definition of Done**: AcmeClient.psm1 replaced, all ACME operations working with Posh-ACME
 
 ---
 
-### Story 2.2: Agent Main Script Simplification
+### [ ] Story 2.2: Agent Main Script Simplification
 **As a** developer
 **I want to** simplify `agent.ps1` by using Posh-ACME cmdlets
 **So that** the code becomes more maintainable and readable
@@ -134,20 +134,20 @@ This document outlines the comprehensive migration plan for replacing our custom
 - Maintenance effort reduced
 
 **Tasks:**
-- [ ] Refactor `Initialize-AcmeAccount` function to use Posh-ACME
+- [x] Refactor `Initialize-AcmeAccount` function to use Posh-ACME
 - [ ] Simplify `Invoke-CertificateRenewal` workflow:
-  - [ ] Replace 12-step manual process with Posh-ACME commands
+  - [x] Replace 12-step manual process with Posh-ACME commands
   - [ ] Remove custom HTTP-01 challenge handling
   - [ ] Leverage Posh-ACME's built-in challenge validation
-- [ ] Maintain force-renew trigger functionality
-- [ ] Preserve CRL validation integration
+- [x] Maintain force-renew trigger functionality
+- [x] Preserve CRL validation integration
 - [ ] Reduce script complexity from ~972 to ~300 lines
 
 **Definition of Done**: agent.ps1 simplified, all functionality preserved with less code
 
 ---
 
-### Story 2.3: Error Handling and Retry Logic Enhancement
+### [ ] Story 2.3: Error Handling and Retry Logic Enhancement
 **As a** developer
 **I want to** leverage Posh-ACME's robust error handling
 **So that** the agent becomes more resilient to transient failures
@@ -169,11 +169,11 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-## Epic 3: Configuration and State Management
+## [ ] Epic 3: Configuration and State Management
 **Sprint Goal**: Implement Posh-ACME's configuration and state management patterns
 **Duration**: 3 days
 
-### Story 3.1: Posh-ACME State Integration
+### [ ] Story 3.1: Posh-ACME State Integration
 **As a** developer
 **I want to** integrate Posh-ACME's state management system
 **So that** certificate and account data is properly persisted
@@ -185,17 +185,17 @@ This document outlines the comprehensive migration plan for replacing our custom
 - State directory properly mounted as volume
 
 **Tasks:**
-- [ ] Configure Posh-ACME state directory in container
+- [x] Configure Posh-ACME state directory in container
 - [ ] Set up Posh-ACME profile system for step-ca
 - [ ] Implement state persistence across container restarts
-- [ ] Configure proper file permissions for Posh-ACME state files
+- [x] Configure proper file permissions for Posh-ACME state files
 - [ ] Test state recovery after container restart
 
 **Definition of Done**: Posh-ACME state working correctly, persistence validated
 
 ---
 
-### Story 3.2: Configuration Management Enhancement
+### [ ] Story 3.2: Configuration Management Enhancement
 **As a** developer
 **I want to** enhance configuration management using Posh-ACME's patterns
 **So that** configuration becomes more flexible and powerful
@@ -207,19 +207,19 @@ This document outlines the comprehensive migration plan for replacing our custom
 - Existing YAML configuration preserved
 
 **Tasks:**
-- [ ] Implement Posh-ACME configuration profiles
-- [ ] Add support for multiple CA environments (dev/staging/prod)
+- [x] Implement Posh-ACME configuration profiles
+- [x] Add support for multiple CA environments (dev/staging/prod)
 - [ ] Integrate Posh-ACME environment variable support:
   - [ ] `POSHACME_HOME` for custom state location
   - [ ] `POSHACME_PLUGINS` for future extensibility
-- [ ] Maintain existing YAML configuration as primary interface
-- [ ] Add validation for Posh-ACME specific configurations
+- [x] Maintain existing YAML configuration as primary interface
+- [x] Add validation for Posh-ACME specific configurations
 
 **Definition of Done**: Enhanced configuration management, backward compatibility maintained
 
 ---
 
-### Story 3.3: Certificate Chain Management
+### [ ] Story 3.3: Certificate Chain Management
 **As a** developer
 **I want to** leverage Posh-ACME's certificate chain management
 **So that** we have better control over certificate chains and intermediates
@@ -231,21 +231,21 @@ This document outlines the comprehensive migration plan for replacing our custom
 - Certificate installation process updated
 
 **Tasks:**
-- [ ] Configure Posh-ACME to handle step-ca certificate chains
-- [ ] Implement intermediate certificate management
-- [ ] Add support for multiple certificate chains if needed
+- [x] Configure Posh-ACME to handle step-ca certificate chains
+- [x] Implement intermediate certificate management
+- [x] Add support for multiple certificate chains if needed
 - [ ] Test certificate chain validation with target services
-- [ ] Update certificate installation process with chain handling
+- [x] Update certificate installation process with chain handling
 
 **Definition of Done**: Certificate chain management working, step-ca integration validated
 
 ---
 
-## Epic 4: Testing and Validation
+## [ ] Epic 4: Testing and Validation
 **Sprint Goal**: Comprehensive testing of migrated implementation
 **Duration**: 4 days
 
-### Story 4.1: Integration Testing Framework
+### [ ] Story 4.1: Integration Testing Framework
 **As a** developer
 **I want to** create comprehensive integration tests for Posh-ACME implementation
 **So that** we ensure migration doesn't break existing functionality
@@ -258,20 +258,20 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 **Tasks:**
 - [ ] Update existing unit tests to use Posh-ACME
-- [ ] Create integration tests for step-ca + Posh-ACME
+- [x] Create integration tests for step-ca + Posh-ACME
 - [ ] Test certificate lifecycle end-to-end:
-  - [ ] Initial certificate issuance
+  - [x] Initial certificate issuance
   - [ ] Certificate renewal
-  - [ ] Certificate installation
+  - [x] Certificate installation
   - [ ] NGINX reload
-- [ ] Test error scenarios and recovery
+- [x] Test error scenarios and recovery
 - [ ] Validate performance characteristics match or improve
 
 **Definition of Done**: Comprehensive test coverage, all tests passing, performance validated
 
 ---
 
-### Story 4.2: Backward Compatibility Testing
+### [ ] Story 4.2: Backward Compatibility Testing
 **As a** developer
 **I want to** ensure migration maintains backward compatibility
 **So that** existing deployments continue to work without changes
@@ -295,7 +295,7 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-### Story 4.3: Performance and Reliability Testing
+### [ ] Story 4.3: Performance and Reliability Testing
 **As a** developer
 **I want to** validate performance and reliability improvements
 **So that** the migration provides tangible benefits
@@ -318,11 +318,11 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-## Epic 5: Documentation and Cleanup
+## [ ] Epic 5: Documentation and Cleanup
 **Sprint Goal**: Complete documentation and remove legacy code
 **Duration**: 3 days
 
-### Story 5.1: Documentation Updates
+### [ ] Story 5.1: Documentation Updates
 **As a** developer
 **I want to** update all documentation to reflect Posh-ACME implementation
 **So that** users understand the new architecture and capabilities
@@ -345,7 +345,7 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-### Story 5.2: Code Cleanup and Optimization
+### [ ] Story 5.2: Code Cleanup and Optimization
 **As a** developer
 **I want to** remove all custom ACME implementation code
 **So that** the codebase becomes cleaner and more maintainable
@@ -368,7 +368,7 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-### Story 5.3: Monitoring and Observability Enhancement
+### [ ] Story 5.3: Monitoring and Observability Enhancement
 **As a** developer
 **I want to** enhance monitoring capabilities with Posh-ACME integration
 **So that** operations teams have better visibility into certificate management
@@ -391,11 +391,11 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-## Epic 6: Advanced Features (Optional/Future)
+## [ ] Epic 6: Advanced Features (Optional/Future)
 **Sprint Goal**: Leverage advanced Posh-ACME capabilities
 **Duration**: 2 weeks (can be deferred)
 
-### Story 6.1: Multiple Challenge Type Support
+### [ ] Story 6.1: Multiple Challenge Type Support
 **As a** developer
 **I want to** support multiple ACME challenge types
 **So that** we can handle different deployment scenarios
@@ -417,7 +417,7 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-### Story 6.2: Account Key Rollover
+### [ ] Story 6.2: Account Key Rollover
 **As a** developer
 **I want to** implement ACME account key rollover
 **So that** we maintain security best practices
@@ -439,7 +439,7 @@ This document outlines the comprehensive migration plan for replacing our custom
 
 ---
 
-### Story 6.3: Multi-CA Support
+### [ ] Story 6.3: Multi-CA Support
 **As a** developer
 **I want to** support multiple Certificate Authorities
 **So that** we have flexibility and redundancy

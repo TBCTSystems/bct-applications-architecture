@@ -29,8 +29,13 @@ try {
 
     # Test state directory
     $testConfig = @{ dummy = "value" } # Config parameter is required but content doesn't matter
+    $env:POSHACME_HOME = "/tmp/posh-acme-adapter-test"
+    if (Test-Path $env:POSHACME_HOME) {
+        Remove-Item -Path $env:POSHACME_HOME -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     $stateDir = Get-PoshAcmeStateDirectory -Config $testConfig
-    $expectedDir = "/config/poshacme"
+    $expectedDir = $env:POSHACME_HOME
 
     if ($stateDir -eq $expectedDir) {
         Write-Host "✓ State directory test passed" -ForegroundColor Green
@@ -40,6 +45,10 @@ try {
         Write-Host "  Expected: $expectedDir" -ForegroundColor White
         Write-Host "  Actual: $stateDir" -ForegroundColor White
         exit 1
+    }
+    Remove-Item Env:POSHACME_HOME -ErrorAction SilentlyContinue
+    if (Test-Path $expectedDir) {
+        Remove-Item -Path $expectedDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     # Test function exports

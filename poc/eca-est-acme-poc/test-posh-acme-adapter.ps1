@@ -48,8 +48,13 @@ try {
 # Test 3: State Directory Configuration
 Write-Host "`nTest 3: Testing state directory configuration..." -ForegroundColor Yellow
 try {
+    $env:POSHACME_HOME = "/tmp/posh-acme-adapter-state"
+    if (Test-Path $env:POSHACME_HOME) {
+        Remove-Item -Path $env:POSHACME_HOME -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     $stateDir = Get-PoshAcmeStateDirectory -Config $config
-    $expectedDir = "/config/poshacme"
+    $expectedDir = $env:POSHACME_HOME
     if ($stateDir -eq $expectedDir) {
         Write-Host "✓ State directory configuration correct" -ForegroundColor Green
         Write-Host "  Directory: $stateDir" -ForegroundColor White
@@ -58,6 +63,10 @@ try {
         Write-Host "  Expected: $expectedDir" -ForegroundColor White
         Write-Host "  Actual: $stateDir" -ForegroundColor White
         exit 1
+    }
+    Remove-Item Env:POSHACME_HOME -ErrorAction SilentlyContinue
+    if (Test-Path $expectedDir) {
+        Remove-Item -Path $expectedDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 } catch {
     Write-Host "✗ State directory configuration failed: $($_.Exception.Message)" -ForegroundColor Red

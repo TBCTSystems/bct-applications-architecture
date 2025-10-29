@@ -546,58 +546,53 @@ function Complete-Http01Challenge {
             challenge_directory = $ChallengeDirectory
         }
 
-        # Configure Posh-ACME server if not already configured
-        $config = @{ pki_url = $BaseUrl }
+        $config = @{
+            pki_url = $BaseUrl
+        }
         Set-PoshAcmeServerFromConfig -Config $config | Out-Null
 
-        # Get current order for challenge processing
-        $currentOrder = Get-PAOrder
+        $challengeSuccess = Invoke-PoshAcmeChallenge -Order $Authorization -ChallengeDirectory $ChallengeDirectory
 
-        if (-not $currentOrder) {
-            throw "No active order found for challenge completion"
+        $orderName = $null
+        if ($Authorization.Order -and $Authorization.Order.Name) {
+            $orderName = $Authorization.Order.Name
+        } elseif ($Authorization.Domain) {
+            $orderName = $Authorization.Domain
+        } elseif ($Authorization.ID) {
+            $orderName = $Authorization.ID
         }
 
-        # Start HTTP-01 challenge listener (Posh-ACME way)
-        Write-LogDebug -Message "Starting HTTP-01 challenge listener"
+        $challengeInfo = $null
+        $status = if ($challengeSuccess) { 'valid' } else { 'pending' }
 
-        # Ensure the challenge directory exists
-        if (-not (Test-Path $ChallengeDirectory)) {
-            New-Item -ItemType Directory -Path $ChallengeDirectory -Force | Out-Null
-        }
-
-        # Start the challenge listener in the background
-        $listenerJob = Start-Job -ScriptBlock {
-            param($OrderName, $ChallengeDir)
-            Import-Module Posh-ACME
-            $order = Get-PAOrder -Name $OrderName
-            Invoke-HttpChallengeListener -PAOrder $order -ChallengeDir $ChallengeDir
-        } -ArgumentList $currentOrder.MainDomain, $ChallengeDirectory
-
-        try {
-            # Submit the challenge response
-            Write-LogDebug -Message "Submitting HTTP-01 challenge response"
-            $result = Complete-PAOrder
-
-            # Wait a moment for the CA to validate
-            Start-Sleep -Seconds 3
-
-            # Stop the listener
-            Stop-Job $listenerJob -ErrorAction SilentlyContinue | Out-Null
-            Remove-Job $listenerJob -ErrorAction SilentlyContinue | Out-Null
-
-            # Return structure compatible with original implementation
-            return @{
-                Challenge = $result
-                Status = $result.status
-                Type = "http-01"
-                CompletedAt = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        if ($orderName) {
+            try {
+                $paOrder = Get-PAOrder -Name $orderName
+                if ($paOrder) {
+                    $authUrl = $paOrder.authorizations | Select-Object -First 1
+                    if ($authUrl) {
+                        $auth = Get-PAAuthorization -AuthURLs $authUrl
+                        if ($auth) {
+                            $challengeInfo = $auth.challenges | Where-Object { $_.type -eq 'http-01' } | Select-Object -First 1
+                            if ($auth.status) {
+                                $status = $auth.status
+                            }
+                        }
+                    }
+                }
+            }
+            catch {
+                Write-LogDebug -Message "Unable to retrieve detailed challenge info after completion" -Context @{
+                    error = $_.Exception.Message
+                }
             }
         }
-        catch {
-            # Ensure listener is stopped on error
-            Stop-Job $listenerJob -ErrorAction SilentlyContinue | Out-Null
-            Remove-Job $listenerJob -ErrorAction SilentlyContinue | Out-Null
-            throw
+
+        return @{
+            Challenge = $challengeInfo
+            Status = $status
+            Type = "http-01"
+            CompletedAt = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
         }
     }
     catch {
@@ -651,15 +646,95 @@ function Wait-ChallengeValidation {
         $config = @{ pki_url = $BaseUrl }
         Set-PoshAcmeServerFromConfig -Config $config | Out-Null
 
-        # Posh-ACME handles challenge validation automatically
-        # This function primarily maintains compatibility
-        Start-Sleep -Seconds 5  # Brief wait for processing
+        $orderName = $null
+        if ($Authorization.Order -and $Authorization.Order.Name) {
+            $orderName = $Authorization.Order.Name
+        } elseif ($Authorization.Domain) {
+            $orderName = $Authorization.Domain
+        } elseif ($Authorization.ID) {
+            $orderName = $Authorization.ID
+        }
 
-        $currentOrder = Get-PAOrder
+        if (-not $orderName) {
+            throw "Unable to determine order name for validation polling"
+        }
 
-        # Return structure compatible with original implementation
+        try {
+            Set-PAOrder -Name $orderName -ErrorAction Stop | Out-Null
+        }
+        catch {
+            Write-LogDebug -Message "Failed to set current order by name during validation polling" -Context @{
+                error = $_.Exception.Message
+                order_name = $orderName
+            }
+            if ($Authorization.Domain) {
+                Set-PAOrder -MainDomain $Authorization.Domain -ErrorAction Stop | Out-Null
+            } else {
+                throw
+            }
+        }
+
+        $paOrder = Get-PAOrder -Name $orderName
+        if (-not $paOrder) {
+            throw "Unable to retrieve order for validation polling"
+        }
+
+        $authUrls = @()
+        if ($paOrder.authorizations) {
+            $authUrls = $paOrder.authorizations
+        } elseif ($Authorization.Authorizations) {
+            $authUrls = $Authorization.Authorizations
+        }
+
+        if (-not $authUrls -or $authUrls.Count -eq 0) {
+            throw "Order does not contain authorization URLs for validation polling"
+        }
+
+        $validationTimeout = 120
+        $pollInterval = 2
+        $deadline = (Get-Date).AddSeconds($validationTimeout)
+        $finalStatus = 'pending'
+
+        while ((Get-Date) -lt $deadline) {
+            $pending = $false
+
+            foreach ($authUrl in $authUrls) {
+                $authStatus = Get-PAAuthorization -AuthURLs $authUrl
+                if (-not $authStatus) {
+                    throw "Failed to refresh authorization status for $authUrl"
+                }
+
+                if ($authStatus.status -eq 'invalid') {
+                    $finalStatus = 'invalid'
+                    break
+                }
+                elseif ($authStatus.status -ne 'valid') {
+                    $pending = $true
+                }
+            }
+
+            if ($finalStatus -eq 'invalid') {
+                break
+            }
+
+            if (-not $pending) {
+                $finalStatus = 'valid'
+                break
+            }
+
+            Start-Sleep -Seconds $pollInterval
+        }
+
+        if ($finalStatus -eq 'pending') {
+            Write-LogWarn -Message "Challenge validation polling timed out" -Context @{
+                order_id = $Authorization.ID
+            }
+        }
+
+        $currentOrder = Get-PAOrder -Name $orderName
+
         return @{
-            Status = $currentOrder.status
+            Status = $finalStatus
             ValidatedAt = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
             Order = $currentOrder
         }
@@ -722,15 +797,57 @@ function Complete-AcmeOrder {
         $config = @{ pki_url = $BaseUrl }
         Set-PoshAcmeServerFromConfig -Config $config | Out-Null
 
-        # Posh-ACME handles order finalization automatically
-        # This function primarily maintains compatibility
-        $result = Submit-PAOrder
+        $orderName = $null
+        if ($Order.Order -and $Order.Order.Name) {
+            $orderName = $Order.Order.Name
+        } elseif ($Order.Domain) {
+            $orderName = $Order.Domain
+        } elseif ($Order.ID) {
+            $orderName = $Order.ID
+        }
 
-        # Return structure compatible with original implementation
+        if (-not $orderName) {
+            throw "Unable to determine order name for finalization"
+        }
+
+        try {
+            Set-PAOrder -Name $orderName -ErrorAction Stop | Out-Null
+        }
+        catch {
+            Write-LogDebug -Message "Failed to set current order by name during finalization" -Context @{
+                error = $_.Exception.Message
+                order_name = $orderName
+            }
+            if ($Order.Domain) {
+                Set-PAOrder -MainDomain $Order.Domain -ErrorAction Stop | Out-Null
+            } else {
+                throw
+            }
+        }
+
+        $paOrder = Get-PAOrder -Name $orderName
+        if (-not $paOrder) {
+            throw "Unable to retrieve order for finalization"
+        }
+
+        if ($paOrder.status -eq 'ready') {
+            Write-LogInfo -Message "Submitting order finalization" -Context @{
+                order_id = $Order.ID
+            }
+            Submit-OrderFinalize $paOrder | Out-Null
+        } elseif ($paOrder.status -ne 'valid') {
+            Write-LogWarn -Message "Order not ready for finalization" -Context @{
+                order_id = $Order.ID
+                status = $paOrder.status
+            }
+        }
+
+        $finalOrder = Get-PAOrder -Name $orderName
+
         return @{
-            Order = $result
-            Status = $result.status
-            Certificate = $result.Certificate
+            Order = $finalOrder
+            Status = $finalOrder.status
+            Certificate = $finalOrder.certificate
             CompletedAt = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
         }
     }
@@ -791,48 +908,126 @@ function Get-AcmeCertificate {
         $waitInterval = 5   # Check interval in seconds
         $elapsedTime = 0
 
-        while ($elapsedTime -lt $maxWaitTime) {
-            $currentOrder = Get-PAOrder
-
-            if ($currentOrder.Status -eq 'ready') {
-                Write-LogInfo -Message "Order is ready, finalizing certificate request"
-                Submit-OrderFinalize | Out-Null
-                break
-            }
-            elseif ($currentOrder.Status -eq 'invalid') {
-                throw "Order validation failed"
-            }
-            elseif ($currentOrder.Status -eq 'valid') {
-                Write-LogInfo -Message "Order is valid, retrieving certificate"
-                break
-            }
-
-            Write-LogDebug -Message "Waiting for order validation, current status: $($currentOrder.Status)"
-            Start-Sleep -Seconds $waitInterval
-            $elapsedTime += $waitInterval
+        $orderName = $null
+        if ($Order.Order -and $Order.Order.Name) {
+            $orderName = $Order.Order.Name
+        } elseif ($Order.Domain) {
+            $orderName = $Order.Domain
+        } elseif ($Order.ID) {
+            $orderName = $Order.ID
         }
 
-        # Check final order status
-        $finalOrder = Get-PAOrder
+        if (-not $orderName) {
+            throw "Unable to determine order name for certificate retrieval"
+        }
+
+        try {
+            Set-PAOrder -Name $orderName -ErrorAction Stop | Out-Null
+        }
+        catch {
+            Write-LogDebug -Message "Failed to set current order by name during certificate retrieval" -Context @{
+                error = $_.Exception.Message
+                order_name = $orderName
+            }
+            if ($Order.Domain) {
+                Set-PAOrder -MainDomain $Order.Domain -ErrorAction Stop | Out-Null
+            } else {
+                throw
+            }
+        }
+
+        Write-LogDebug -Message "Starting order poll for certificate issuance" -Context @{
+            order_id = $Order.ID
+            order_name = $orderName
+            max_wait_seconds = $maxWaitTime
+            wait_interval_seconds = $waitInterval
+        }
+
+        while ($elapsedTime -lt $maxWaitTime) {
+            $currentOrder = Get-PAOrder -Name $orderName -Refresh
+
+            Write-LogDebug -Message "Polled order state during certificate retrieval" -Context @{
+                order_id = $Order.ID
+                order_name = $orderName
+                status = $currentOrder.status
+                has_certificate = [bool]([string]::IsNullOrWhiteSpace($currentOrder.certificate) -eq $false)
+                elapsed_seconds = $elapsedTime
+            }
+
+            switch ($currentOrder.status) {
+                'ready' {
+                    Write-LogInfo -Message "Order ready, finalizing with CSR" -Context @{
+                        order_id = $Order.ID
+                    }
+                    Submit-OrderFinalize $currentOrder | Out-Null
+                }
+                'valid' {
+                    Write-LogInfo -Message "Order valid, proceeding to certificate download" -Context @{
+                        order_id = $Order.ID
+                        has_certificate = [bool]([string]::IsNullOrWhiteSpace($currentOrder.certificate) -eq $false)
+                    }
+                    break
+                }
+                'invalid' {
+                    throw "Order validation failed"
+                }
+                default {
+                    Write-LogDebug -Message "Waiting for order validation" -Context @{
+                        order_id = $Order.ID
+                        status = $currentOrder.status
+                    }
+                    Start-Sleep -Seconds $waitInterval
+                    $elapsedTime += $waitInterval
+                    continue
+                }
+            }
+            break
+        }
+
+        $finalOrder = Get-PAOrder -Name $orderName -Refresh
         if ($finalOrder.Status -ne 'valid') {
             throw "Order did not become valid within timeout period. Final status: $($finalOrder.Status)"
         }
+        else {
+            Write-LogDebug -Message "Final order state prior to certificate retrieval" -Context @{
+                order_id = $Order.ID
+                order_name = $orderName
+                status = $finalOrder.Status
+                has_certificate = [bool]([string]::IsNullOrWhiteSpace($finalOrder.certificate) -eq $false)
+            }
+        }
 
-        # Get certificate using Posh-ACME
-        $certInfo = Get-PACertificate
+        $paCertificate = Complete-PAOrder -Order $finalOrder
 
-        if ($certInfo) {
-            # Return structure compatible with original implementation
+        if ($paCertificate) {
+            $adapterCert = Convert-PACertificateToAdapterInfo -Certificate $paCertificate
+            if (-not $adapterCert) {
+                throw "Failed to convert certificate information for adapter consumption"
+            }
+
+            # Return structure compatible with original implementation while exposing additional metadata
             return @{
-                Certificate = $certInfo.CertFile
-                CertificateChain = $certInfo.ChainFile
-                PrivateKey = $certInfo.KeyFile
-                FullChain = $certInfo.FullChainFile
-                IssuedAt = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
-                Order = $Order.Order
-                Status = "issued"
+                Certificate        = $adapterCert.CertFile
+                CertificatePath    = $adapterCert.CertFilePath
+                CertificateChain   = $adapterCert.ChainFile
+                CertificateChainPath = $adapterCert.ChainFilePath
+                PrivateKey         = $adapterCert.KeyFile
+                PrivateKeyPath     = $adapterCert.KeyFilePath
+                FullChain          = $adapterCert.FullChainFile
+                FullChainPath      = $adapterCert.FullChainFilePath
+                IssuedAt           = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+                Order              = $Order.Order
+                Status             = "issued"
+                Metadata           = $adapterCert
             }
         } else {
+            Write-LogWarn -Message "Get-PACertificate returned null" -Context @{
+                order_id = $Order.ID
+                order_name = $orderName
+                status = $finalOrder.Status
+                has_certificate = [bool]([string]::IsNullOrWhiteSpace($finalOrder.certificate) -eq $false)
+                poshacme_home = $env:POSHACME_HOME
+            }
             throw "Certificate not available"
         }
     }
