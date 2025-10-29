@@ -17,8 +17,6 @@
 #
 # For more information, see docs/01_Plan_Overview_and_Setup.md
 
-version: '3.8'
-
 # ============================================
 # Network Configuration
 # ============================================

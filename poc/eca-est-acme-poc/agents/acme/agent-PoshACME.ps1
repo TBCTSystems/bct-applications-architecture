@@ -563,8 +563,19 @@ function Invoke-CertificateRenewal {
         # STEP 2: Complete HTTP-01 challenge
         Write-LogDebug -Message "Handling HTTP-01 challenge"
 
-        $challengeDir = "/challenge"
+        # Get challenge directory from config (with fallback)
+        $challengeDir = if ($Config.ContainsKey('challenge_directory')) {
+            $Config.challenge_directory
+        } else {
+            "/challenge"
+        }
+
         $challengeRoot = Join-Path -Path $challengeDir -ChildPath ".well-known/acme-challenge"
+
+        Write-LogDebug -Message "Using challenge directory" -Context @{
+            challenge_directory = $challengeDir
+            challenge_root = $challengeRoot
+        }
 
         if (-not (Test-Path -Path $challengeRoot)) {
             New-Item -ItemType Directory -Path $challengeRoot -Force | Out-Null

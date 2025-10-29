@@ -109,6 +109,24 @@ renewal_threshold_pct: 75
 # Environment variable override: <prefix>CHECK_INTERVAL_SEC
 check_interval_sec: 60
 
+# ACME Challenge Directory
+# -------------------------
+# Base directory where HTTP-01 challenge tokens are placed for CA validation.
+# The ACME CA will attempt to fetch challenge tokens from:
+#   http://{domain_name}/.well-known/acme-challenge/{token}
+#
+# This directory must be:
+#   - Writable by the agent
+#   - Served by the target web server (typically NGINX)
+#   - Mounted as a shared volume in Docker deployments
+#
+# The agent will automatically create the .well-known/acme-challenge subdirectory
+# structure if it doesn't exist.
+#
+# Default: /challenge
+# Environment variable override: <prefix>CHALLENGE_DIRECTORY (e.g., ACME_CHALLENGE_DIRECTORY)
+challenge_directory: "/challenge"
+
 # Posh-ACME State Directory
 # -------------------------
 # Posh-ACME stores account and order state in the directory pointed to the
@@ -122,11 +140,8 @@ check_interval_sec: 60
 # The following values are HARDCODED in the agent modules and cannot be
 # configured via this file or environment variables:
 #
-# - ACME Provisioner Name: "acme" (hardcoded in AcmeClient.psm1)
+# - ACME Provisioner Name: "acme" (hardcoded for step-ca)
 #   This is the step-ca provisioner name used for ACME protocol.
-#
-# - Challenge Directory: "/challenge/.well-known/acme-challenge" (hardcoded in AcmeClient.psm1)
-#   This is where HTTP-01 challenge tokens are placed for CA validation.
 #
 # - Target Service Name: "target-server" (hardcoded in ServiceReloadController.psm1)
 #   This is the Docker container name for the NGINX service to reload.
