@@ -146,15 +146,23 @@ function Merge-ConfigWithEnvironment {
 
     # Mapping of YAML field names (snake_case) to environment variable names (UPPER_SNAKE_CASE)
     $envMappings = @{
-        'pki_url'                = 'PKI_URL'
-        'cert_path'              = 'CERT_PATH'
-        'key_path'               = 'KEY_PATH'
-        'domain_name'            = 'DOMAIN_NAME'
-        'device_name'            = 'DEVICE_NAME'
-        'renewal_threshold_pct'  = 'RENEWAL_THRESHOLD_PCT'
-        'check_interval_sec'     = 'CHECK_INTERVAL_SEC'
-        'bootstrap_token'        = 'BOOTSTRAP_TOKEN'
-        'agent_id'               = 'AGENT_ID'
+        'agent_name'                       = 'AGENT_NAME'
+        'pki_url'                          = 'PKI_URL'
+        'cert_path'                        = 'CERT_PATH'
+        'key_path'                         = 'KEY_PATH'
+        'domain_name'                      = 'DOMAIN_NAME'
+        'device_name'                      = 'DEVICE_NAME'
+        'renewal_threshold_pct'            = 'RENEWAL_THRESHOLD_PCT'
+        'check_interval_sec'               = 'CHECK_INTERVAL_SEC'
+        'bootstrap_token'                  = 'BOOTSTRAP_TOKEN'
+        'agent_id'                         = 'AGENT_ID'
+        'challenge_directory'              = 'CHALLENGE_DIRECTORY'
+        'acme_account_contact_email'       = 'ACME_ACCOUNT_CONTACT_EMAIL'
+        'acme_directory_path'              = 'ACME_DIRECTORY_PATH'
+        'acme_certificate_key_type'        = 'ACME_CERTIFICATE_KEY_TYPE'
+        'acme_certificate_key_size'        = 'ACME_CERTIFICATE_KEY_SIZE'
+        'service_reload_container_name'    = 'SERVICE_RELOAD_CONTAINER_NAME'
+        'service_reload_timeout_seconds'   = 'SERVICE_RELOAD_TIMEOUT_SECONDS'
     }
 
     foreach ($configKey in $envMappings.Keys) {
@@ -209,6 +217,24 @@ function Merge-ConfigWithEnvironment {
         }
         catch {
             throw "Configuration error: Field 'check_interval_sec' must be an integer (got: '$($Config['check_interval_sec'])')"
+        }
+    }
+
+    if ($Config.ContainsKey('acme_certificate_key_size') -and $Config['acme_certificate_key_size'] -is [string]) {
+        try {
+            $Config['acme_certificate_key_size'] = [int]$Config['acme_certificate_key_size']
+        }
+        catch {
+            throw "Configuration error: Field 'acme_certificate_key_size' must be an integer (got: '$($Config['acme_certificate_key_size'])')"
+        }
+    }
+
+    if ($Config.ContainsKey('service_reload_timeout_seconds') -and $Config['service_reload_timeout_seconds'] -is [string]) {
+        try {
+            $Config['service_reload_timeout_seconds'] = [int]$Config['service_reload_timeout_seconds']
+        }
+        catch {
+            throw "Configuration error: Field 'service_reload_timeout_seconds' must be an integer (got: '$($Config['service_reload_timeout_seconds'])')"
         }
     }
 }
@@ -516,35 +542,50 @@ function Read-AgentConfig {
         throw "Failed to parse YAML configuration from '$ConfigFilePath': $($_.Exception.Message)"
     }
 
-    # 3. Merge with environment variables (overrides YAML values)
+    # 3. Build environment variable prefix list
+    # Priority order:
+    #   1. Explicit EnvVarPrefixes parameter (caller-provided)
+    #   2. agent_name from config file (enables multi-instance deployments)
+    #   3. Unprefixed fallback (legacy mode)
+
     $prefixList = @()
-    if ($EnvVarPrefixes -and $EnvVarPrefixes.Count -gt 0) {
+
+    # Use explicit prefixes if provided
+    if ($EnvVarPrefixes -and $EnvVarPrefixes.Count -gt 0 -and $EnvVarPrefixes[0] -ne "") {
         $prefixList += $EnvVarPrefixes
+        Write-LogDebug -Message "Using explicit environment variable prefixes" -Context @{
+            prefixes = ($EnvVarPrefixes -join ", ")
+            source = "EnvVarPrefixes parameter"
+        }
     }
-    if (-not ($prefixList | Where-Object { $_ -eq "" })) {
-        $prefixList += ""
-    }
+    # Otherwise derive prefix from agent_name in config file
+    elseif ($config.ContainsKey('agent_name') -and -not [string]::IsNullOrWhiteSpace($config.agent_name)) {
+        $agentName = $config.agent_name
+        # Replace hyphens with underscores (env vars can't contain hyphens)
+        # e.g., "acme-app1" becomes "ACME_APP1_"
+        $derivedPrefix = ($agentName -replace '-', '_').ToUpper() + '_'
+        $prefixList += $derivedPrefix
 
-    # Runtime validation: Log effective prefix configuration
-    $agentEnvPrefix = [System.Environment]::GetEnvironmentVariable("AGENT_ENV_PREFIX")
-    $agentName = [System.Environment]::GetEnvironmentVariable("AGENT_NAME")
-
-    if ($agentEnvPrefix -or $agentName) {
-        $effectivePrefix = if ($agentEnvPrefix) { $agentEnvPrefix } else { "${agentName}_" }
-        Write-LogInfo -Message "Environment variable prefixing enabled" -Context @{
-            effective_prefix = $effectivePrefix
-            source = if ($agentEnvPrefix) { "AGENT_ENV_PREFIX" } else { "AGENT_NAME (auto-suffix)" }
-            prefix_list = ($prefixList -join ", ")
+        Write-LogInfo -Message "Environment variable prefix derived from config" -Context @{
+            agent_name = $agentName
+            prefix = $derivedPrefix
+            source = "agent_name field in config file"
         }
     }
     else {
         Write-LogWarn -Message "No environment variable prefix configured - using legacy unprefixed mode" -Context @{
-            warning = "Multiple agents on same host may experience config collisions"
-            recommendation = "Set AGENT_ENV_PREFIX or AGENT_NAME for production deployments"
+            warning = "Multiple agent instances on same host may experience config collisions"
+            recommendation = "Add 'agent_name' field to config file for multi-instance deployments"
             see_docs = "docs/WINDOWS_DEPLOYMENT.md"
         }
     }
 
+    # Always include unprefixed fallback for backward compatibility
+    if (-not ($prefixList | Where-Object { $_ -eq "" })) {
+        $prefixList += ""
+    }
+
+    # 4. Merge with environment variables (overrides YAML values)
     Merge-ConfigWithEnvironment -Config $config -EnvPrefixes $prefixList
 
     # 4. Apply default values for optional fields

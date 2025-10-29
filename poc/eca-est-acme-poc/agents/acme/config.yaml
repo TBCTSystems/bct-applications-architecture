@@ -5,6 +5,26 @@
 # The agent validates this configuration against the JSON schema at:
 # config/agent_config_schema.json
 
+# Agent Identity
+# --------------
+# Unique identifier for this agent instance, used to derive environment variable prefix.
+# For multi-instance deployments (multiple ACME agents on same host), each agent must
+# have a unique agent_name to avoid configuration collisions.
+#
+# The agent_name is automatically converted to uppercase and used as the prefix for
+# environment variable overrides. For example:
+#   agent_name: "acme-app1" → Environment variables: ACME_APP1_PKI_URL, ACME_APP1_CERT_PATH, etc.
+#   agent_name: "acme-app2" → Environment variables: ACME_APP2_PKI_URL, ACME_APP2_CERT_PATH, etc.
+#
+# This enables scenarios like:
+#   - Multiple applications on same host, each with dedicated ACME agent
+#   - Different ACME servers for different applications
+#   - Per-application certificate policies and renewal schedules
+#
+# Leave empty to use unprefixed environment variables (legacy mode, not recommended for multi-instance).
+# Environment variable override: AGENT_NAME (but typically set in config file for instance identity)
+agent_name: "acme"
+
 # PKI Server Configuration
 # ---------------------
 # ACME Certificate Authority configuration with multi-environment support.
@@ -126,6 +146,83 @@ check_interval_sec: 60
 # Default: /challenge
 # Environment variable override: <prefix>CHALLENGE_DIRECTORY (e.g., ACME_CHALLENGE_DIRECTORY)
 challenge_directory: "/challenge"
+
+# =============================================================================
+# ACME Protocol Configuration
+# =============================================================================
+
+# ACME Account Contact Email
+# ---------------------------
+# Optional contact email address for the ACME account (RFC 8555 compliance).
+# The CA may use this email to send notifications about certificate expiration,
+# revocation, or other account-related events.
+#
+# Format: Valid email address (e.g., "admin@example.com")
+# Leave empty to create account without contact information.
+#
+# Environment variable override: <prefix>ACME_ACCOUNT_CONTACT_EMAIL (e.g., ACME_ACME_ACCOUNT_CONTACT_EMAIL)
+acme_account_contact_email: ""
+
+# ACME Directory Path
+# -------------------
+# Path component of the ACME directory URL relative to the PKI base URL.
+# For step-ca, this is typically "/acme/acme/directory" where the first "acme"
+# is the provisioner name and the second "acme" is the ACME protocol endpoint.
+#
+# Full directory URL: {pki_url}{acme_directory_path}
+# Example: https://pki:9000/acme/acme/directory
+#
+# Default: /acme/acme/directory (step-ca default)
+# Environment variable override: <prefix>ACME_DIRECTORY_PATH (e.g., ACME_ACME_DIRECTORY_PATH)
+acme_directory_path: "/acme/acme/directory"
+
+# Certificate Key Type
+# ---------------------
+# Cryptographic algorithm for certificate private key generation.
+#
+# Supported values:
+#   - "rsa": RSA key (size controlled by acme_certificate_key_size)
+#   - "ec": Elliptic Curve key (P-256 or P-384 based on key_size)
+#
+# Recommendations:
+#   - RSA-2048: Widely compatible, moderate performance
+#   - RSA-4096: Maximum compatibility, slower performance
+#   - EC P-256: Modern, fast, smaller keys (recommended for new deployments)
+#   - EC P-384: Enhanced security margin
+#
+# Default: rsa
+# Environment variable override: <prefix>ACME_CERTIFICATE_KEY_TYPE (e.g., ACME_ACME_CERTIFICATE_KEY_TYPE)
+acme_certificate_key_type: "rsa"
+
+# Certificate Key Size
+# --------------------
+# Key size in bits for certificate private key generation.
+#
+# For RSA keys:
+#   - 2048: Standard, widely supported (recommended minimum)
+#   - 4096: Enhanced security, slower operations
+#
+# For EC keys:
+#   - 256: P-256 curve (secp256r1 / prime256v1)
+#   - 384: P-384 curve (secp384r1)
+#
+# Default: 2048
+# Environment variable override: <prefix>ACME_CERTIFICATE_KEY_SIZE (e.g., ACME_ACME_CERTIFICATE_KEY_SIZE)
+acme_certificate_key_size: 2048
+
+# Service Reload Configuration
+# -----------------------------
+# Configuration for reloading the target service (e.g., NGINX) after certificate renewal.
+
+# Service container name (for Docker deployments)
+# The Docker container name to send reload signals to.
+# Environment variable override: <prefix>SERVICE_RELOAD_CONTAINER_NAME (e.g., ACME_SERVICE_RELOAD_CONTAINER_NAME)
+service_reload_container_name: "eca-target-server"
+
+# Service reload timeout (seconds)
+# Maximum time to wait for service reload operation to complete.
+# Environment variable override: <prefix>SERVICE_RELOAD_TIMEOUT_SECONDS (e.g., ACME_SERVICE_RELOAD_TIMEOUT_SECONDS)
+service_reload_timeout_seconds: 10
 
 # Posh-ACME State Directory
 # -------------------------

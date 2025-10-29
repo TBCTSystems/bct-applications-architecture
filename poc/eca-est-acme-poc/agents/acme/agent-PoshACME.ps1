@@ -152,13 +152,17 @@ function global:Write-LogDebug { param([Parameter(Mandatory=$true)][string]$Mess
 function Get-AcmeDirectoryUrl {
     <#
     .SYNOPSIS
-        Construct ACME directory URL from base PKI URL.
+        Construct ACME directory URL from base PKI URL and optional directory path.
     #>
     [CmdletBinding()]
-    param([Parameter(Mandatory = $true)][string]$PkiUrl)
+    param(
+        [Parameter(Mandatory = $true)][string]$PkiUrl,
+        [Parameter(Mandatory = $false)][string]$DirectoryPath = "/acme/acme/directory"
+    )
 
     $cleanUrl = $PkiUrl.TrimEnd('/')
-    return "${cleanUrl}/acme/acme/directory"
+    $cleanPath = $DirectoryPath.TrimStart('/')
+    return "${cleanUrl}/${cleanPath}"
 }
 
 function Initialize-PoshAcmeEnvironment {
@@ -192,7 +196,13 @@ function Initialize-PoshAcmeEnvironment {
         }
 
         # Configure Posh-ACME server
-        $directoryUrl = Get-AcmeDirectoryUrl -PkiUrl $Config.pki_url
+        $directoryPath = if ($Config.ContainsKey('acme_directory_path') -and -not [string]::IsNullOrWhiteSpace($Config.acme_directory_path)) {
+            $Config.acme_directory_path
+        } else {
+            "/acme/acme/directory"
+        }
+
+        $directoryUrl = Get-AcmeDirectoryUrl -PkiUrl $Config.pki_url -DirectoryPath $directoryPath
 
         Write-LogInfo -Message "Configuring Posh-ACME server" -Context @{
             directory_url = $directoryUrl
@@ -356,7 +366,19 @@ function Initialize-AcmeAccount {
 
         # Create new account if none exists
         Write-LogInfo -Message "Creating new Posh-ACME account"
-        $newAccount = New-PAAccount -AcceptTOS
+
+        # Build New-PAAccount parameters
+        $accountParams = @{ AcceptTOS = $true }
+
+        # Add contact email if configured
+        if ($Config.ContainsKey('acme_account_contact_email') -and -not [string]::IsNullOrWhiteSpace($Config.acme_account_contact_email)) {
+            $accountParams['Contact'] = $Config.acme_account_contact_email
+            Write-LogDebug -Message "ACME account will include contact email" -Context @{
+                contact = $Config.acme_account_contact_email
+            }
+        }
+
+        $newAccount = New-PAAccount @accountParams
 
         Write-LogInfo -Message "ACME account created successfully" -Context @{
             account_id = $newAccount.ID
@@ -550,7 +572,29 @@ function Invoke-CertificateRenewal {
             domain_name = $Config.domain_name
         }
 
-        $order = New-PAOrder -Domain $Config.domain_name -Force
+        # Build New-PAOrder parameters
+        $orderParams = @{
+            Domain = $Config.domain_name
+            Force = $true
+        }
+
+        # Add key type and size if configured
+        if ($Config.ContainsKey('acme_certificate_key_type') -and -not [string]::IsNullOrWhiteSpace($Config.acme_certificate_key_type)) {
+            $keyType = $Config.acme_certificate_key_type.ToLower()
+
+            if ($keyType -eq 'rsa') {
+                $keySize = if ($Config.ContainsKey('acme_certificate_key_size')) { $Config.acme_certificate_key_size } else { 2048 }
+                $orderParams['KeyLength'] = "rsa$keySize"
+                Write-LogDebug -Message "Using RSA key for certificate" -Context @{ key_size = $keySize }
+            }
+            elseif ($keyType -eq 'ec') {
+                $keySize = if ($Config.ContainsKey('acme_certificate_key_size')) { $Config.acme_certificate_key_size } else { 256 }
+                $orderParams['KeyLength'] = "ec$keySize"
+                Write-LogDebug -Message "Using EC key for certificate" -Context @{ key_size = $keySize }
+            }
+        }
+
+        $order = New-PAOrder @orderParams
 
         Write-LogInfo -Message "ACME order created" -Context @{
             main_domain = $order.MainDomain
@@ -687,7 +731,18 @@ function Invoke-CertificateRenewal {
         # STEP 7: Reload NGINX service
         Write-LogDebug -Message "Reloading NGINX service"
 
-        $reloadResult = Invoke-NginxReload
+        # Build Invoke-NginxReload parameters from config
+        $reloadParams = @{}
+
+        if ($Config.ContainsKey('service_reload_container_name') -and -not [string]::IsNullOrWhiteSpace($Config.service_reload_container_name)) {
+            $reloadParams['ContainerName'] = $Config.service_reload_container_name
+        }
+
+        if ($Config.ContainsKey('service_reload_timeout_seconds') -and $Config.service_reload_timeout_seconds -gt 0) {
+            $reloadParams['TimeoutSeconds'] = $Config.service_reload_timeout_seconds
+        }
+
+        $reloadResult = Invoke-NginxReload @reloadParams
 
         if ($reloadResult) {
             Write-LogInfo -Message "NGINX service reloaded successfully"
@@ -756,6 +811,8 @@ function Start-AcmeAgent {
 
     try {
         # Load configuration
+        # ConfigManager will automatically read agent_name from the config file
+        # and use it to build the environment variable prefix (e.g., "acme-app1" -> "ACME_APP1_")
         Write-LogInfo -Message "Loading configuration" -Context @{
             config_path = "/agent/config.yaml"
         }
@@ -763,6 +820,7 @@ function Start-AcmeAgent {
         $config = Read-AgentConfig -ConfigFilePath "/agent/config.yaml"
 
         Write-LogInfo -Message "Configuration loaded successfully" -Context @{
+            agent_name = if ($config.ContainsKey('agent_name')) { $config.agent_name } else { "(none)" }
             domain_name = $config.domain_name
             pki_url = $config.pki_url
             renewal_threshold_pct = $config.renewal_threshold_pct
