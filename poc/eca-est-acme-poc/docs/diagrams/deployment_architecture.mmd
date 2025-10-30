@@ -7,7 +7,6 @@ flowchart TB
             EST[eca-est-agent\nPowerShell 7.4]
             NGINX[target-server\nnginx:1.25]
             CLIENT[target-client\nalpine:latest]
-            UI[web-ui (optional)\nnode:20-alpine]
         end
 
         subgraph Volumes [Docker Volumes]
@@ -21,8 +20,6 @@ flowchart TB
         NGINX --- VolServer
         CLIENT --- VolClient
         PKI --- VolPKI
-        UI --- VolServer
-        UI --- VolClient
 
         ACME -- ACME HTTPS 9000 --> PKI
         EST -- EST HTTPS 9000 --> PKI
@@ -30,13 +27,11 @@ flowchart TB
         CLIENT -- mTLS 443 --> NGINX
     end
 
-    UI -. exposes 8080 .- Host
     NGINX -. exposes 443 .- Host
     PKI -. exposes 9000 .- Host
 
     Operator([Operator/Developer\nBrowser + Docker CLI])
     Operator -- HTTPS 443 --> NGINX
     Operator -- HTTPS 9000 --> PKI
-    Operator -- HTTP 8080 --> UI
     Operator -- docker compose --> Host
 ```

@@ -163,6 +163,7 @@ run_unit_tests() {
 
     # Run unit tests in Docker
     if docker compose run --rm $coverage_flag test-runner pwsh -Command "
+        Import-Module Pester -Force
         \$config = New-PesterConfiguration
         \$config.Run.Path = './tests/unit'
         \$config.Run.Exit = \$true
@@ -220,6 +221,7 @@ run_integration_tests() {
 
     # Run integration tests in Docker (connected to same network as PKI)
     if docker compose run --rm test-runner pwsh -Command "
+        Import-Module Pester -Force
         \$config = New-PesterConfiguration
         \$config.Run.Path = './tests/integration'
         \$config.Run.Exit = \$true

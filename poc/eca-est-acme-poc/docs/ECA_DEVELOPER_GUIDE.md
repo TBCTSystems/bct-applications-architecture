@@ -36,7 +36,6 @@ This guide explains how the Edge Certificate Agent (ECA) proof of concept is put
 │                   │ /certs/client volume      │                   │
 │                   └───────────────────────────┘                   │
 │                                                                    │
-│  Fluentd → Loki → Grafana  (observability stack)                   │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -44,7 +43,6 @@ This guide explains how the Edge Certificate Agent (ECA) proof of concept is put
 - **OpenXPKI**: Provides EST automation. The init-volumes scripts provision the configuration volume and database once.
 - **Agents**: PowerShell services that run inside containers. They share code under `agents/common/` for config parsing, logging, crypto, CRL validation, etc.
 - **Targets**: `target-server` (NGINX) models an edge service relying on server certificates; `target-client` models a device performing mTLS using EST-issued credentials.
-- **Observability**: Fluentd collects container logs, Loki stores them, Grafana visualises them. Dashboards are pre-provisioned for demo readiness.
 
 ### 1.2 Agent Lifecycle
 
@@ -113,7 +111,7 @@ When you introduce a new setting:
 
 1. Add it to the schema with a description, examples, and defaults.
 2. Extend `agents/common/ConfigManager.psm1` to map the new field into runtime settings.
-3. Document it in `docs/OBSERVABILITY_WORKFLOW.md` or other relevant guides if it impacts operations.
+3. Document it in this guide or `README.md` if it impacts operations.
 4. Add tests covering both default and override behaviour.
 
 ---
@@ -124,18 +122,14 @@ All tests run via Pester (PowerShell) with helper scripts for both Bash and Powe
 
 - **Unit Tests** (`tests/unit/*`):
   - Validate protocol clients, config manager, CRL validator, logging, etc.
-  - Run with `./scripts/run-tests.sh -u` or `.\scripts\run-tests.ps1 -UnitOnly`.
+  - Run with `./scripts/run-tests.sh -u` or `pwsh -File scripts/run-tests.ps1 -UnitOnly`.
 - **Integration Tests** (`tests/integration/*`):
   - Require PKI stack services.
-  - Run with `./scripts/run-tests.sh --auto-start-integration` or `.\scripts\run-tests.ps1 -AutoStartIntegration`.
-- **Docker Harness**:
-  - `./scripts/run-tests-docker.sh` mirrors the CI pipeline (no local PowerShell needed).
+  - Run with `./scripts/run-tests.sh --auto-start-integration` or `pwsh -File scripts/run-tests.ps1 -IntegrationOnly -AutoStartIntegration`.
 - **CI Workflow**:
   - `.github/workflows/test.yml` executes both suites on push/pull-request.
-- **Logging Verification**:
-  - `./scripts/verify-logging.sh` validates Fluentd → Loki → Grafana connectivity and dashboards.
 
-Every test run emits coverage to `tests/coverage.xml`. Unit tests complete in ~30s, integration in ~2 minutes when infrastructure is already running.
+Generate coverage reports with `--coverage` (Bash) or `-Coverage` (PowerShell); results land in `tests/coverage.xml`. Unit tests complete in ~30s, integration in ~2 minutes when infrastructure is already running.
 
 ---
 
@@ -156,12 +150,12 @@ Use this checklist to introduce a new agent type (e.g., SCEP, proprietary API, e
    - Document overrides in this guide and in `README.md` under *Agent Configuration Overrides*.
 
 3. **Environment Prefix**
-   - Ensure the Docker compose service sets `AGENT_ENV_PREFIX` (e.g., `NEWAGENT_`).
-   - If the agent will be hosted as a Windows Service, document the prefix in `docs/WINDOWS_DEPLOYMENT.md`.
+  - Ensure the Docker compose service sets `AGENT_ENV_PREFIX` (e.g., `NEWAGENT_`).
+  - If the agent will be hosted as a Windows Service, document the prefix alongside your deployment instructions.
 
 4. **Docker Compose**
-   - Add a new service definition reusing the existing volume layout or introducing new ones as needed.
-   - Wire dependencies (PKI, targets) and logging driver configuration.
+  - Add a new service definition reusing the existing volume layout or introducing new ones as needed.
+  - Wire dependencies (PKI, targets) and ensure shared volumes are mounted correctly.
 
 5. **Testing**
    - Create `tests/unit/<NewAgent>.Tests.ps1` covering config parsing, protocol flows, and failure cases.
@@ -172,52 +166,34 @@ Use this checklist to introduce a new agent type (e.g., SCEP, proprietary API, e
    - Update `README.md` and `docs/` references (architecture diagram, quickstarts).
    - Capture operational notes (how to force renewals, how to simulate failures).
 
-7. **Observability**
-   - Emit structured logs compatible with Fluentd/Loki (use `Logger.psm1`).
-   - Extend Grafana dashboards if new metrics/log streams are introduced.
+7. **Logging**
+   - Emit structured logs to stdout using `Logger.psm1` so they are available via `docker compose logs`.
+   - Document any additional log forwarding requirements if your deployment needs them.
 
 Following this process keeps the codebase schema-valid, testable, and demo-ready.
 
 ---
 
-## 5. Observability & Grafana Access
+## 5. Operations Checklist
 
-1. Start the observability stack and populate sample data:
-
-   ```bash
-   ./scripts/observability.sh demo
-   # or on Windows
-   .\scripts\observability.ps1 demo
-   ```
-
-   The script starts Fluentd, Loki, Grafana, restarts agents, and runs `verify-logging` to ensure data is flowing.
-
-2. Log in to Grafana:
-   - URL: `http://localhost:3000`
-   - Username: `admin`
-   - Password: `eca-admin` (change it via the UI if you expose the stack beyond local demos).
-
-3. Navigate to **Dashboards → ECA PoC** and explore:
-   - **ECA - Certificate Lifecycle**
-   - **ECA - Operations**
-   - **ECA - Logs Explorer**
-   - **ECA - CRL Monitoring**
-
-4. Troubleshooting:
-   - Re-run `./scripts/observability.sh verify -v` for rich diagnostics.
-   - Inspect container logs with `docker compose logs loki` etc.
-   - See `docs/OBSERVABILITY_WORKFLOW.md` for in-depth guidance.
+- **Logs:** `docker compose logs -f eca-acme-agent` and `docker compose logs -f eca-est-agent` expose structured JSON emitted by the agents.
+- **PKI health:** `curl -k https://localhost:9000/health` and `curl -k https://localhost:8443/.well-known/est/cacerts` confirm both enrollment endpoints are reachable.
+- **Certificate material:** Inspect volumes with `docker run --rm -v server-certs:/data alpine ls -l /data` (and `client-certs`).
+- **Expiry checks:** `openssl x509 -in cert.pem -noout -dates` verifies rotation behaviour directly from the mounted volumes.
+- **Resetting the lab:** `docker compose down` plus `docker volume rm pki-data server-certs client-certs challenge openxpki-config-data openxpki-db openxpki-socket openxpki-client-socket openxpki-db-socket openxpki-log openxpki-log-ui openxpki-download` returns the environment to a clean slate (rerun the init script afterwards).
+- **Aggregated observability:** `./scripts/observability.sh demo` (or `.ps1`) boots Fluentd → Loki → Grafana, then `http://localhost:3000` serves the dashboards (`admin` / `eca-admin`). Use `./scripts/verify-logging.sh` when you need an automated pipeline health check.
 
 ---
 
 ## 6. Reference Materials
 
-- `README.md` — Quick start, configuration snippets, observability overview.
-- `QUICKSTART.md` — Hands-on setup walkthrough.
+- `README.md` — Quick start and operator notes.
+- `QUICKSTART.md` — Hands-on setup walkthrough and verification steps.
 - `docs/ARCHITECTURE.md` — Detailed architecture notes and diagrams.
-- `docs/OBSERVABILITY_WORKFLOW.md` — Operations guide for logging stack.
-- `docs/WINDOWS_DEPLOYMENT.md` — Service installation and prefix guidance on Windows.
-- `config/agent_config_schema.json` — Authoritative config reference.
+- `docs/PKI_INITIALIZATION.md` — Deep dive on volume bootstrapping and certificate provisioning.
+- `docs/TESTING.md` — Full test matrix, expected outcomes, and troubleshooting tips.
+- `docs/OBSERVABILITY_WORKFLOW.md` — Fluentd → Loki → Grafana operations and troubleshooting.
+- `config/agent_config_schema.json` — Authoritative configuration reference.
 - `tests/` — Unit/integration suites (great examples for new tests).
 
 Use this guide as the canonical orientation document for the PoC; keep it updated as new capabilities land.

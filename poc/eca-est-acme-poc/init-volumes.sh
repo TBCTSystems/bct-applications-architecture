@@ -382,6 +382,13 @@ initialize_openxpki_database() {
         sleep 2
     done
 
+    # Determine whether schema already exists (check for core table)
+    if docker exec eca-openxpki-db mariadb -N -uopenxpki -popenxpki \
+        -e "SHOW TABLES LIKE 'aliases'" openxpki | grep -q aliases; then
+        log_info "Existing OpenXPKI schema detected – skipping import"
+        return
+    fi
+
     # Copy schema file and import it
     log_info "Importing database schema..."
 

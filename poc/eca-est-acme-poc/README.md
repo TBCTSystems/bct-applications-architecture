@@ -123,7 +123,7 @@ The ECA PoC demonstrates a **unified PKI architecture** using industry-standard 
 - `agents/acme/agent.ps1` + `AcmeClient.psm1` implement the ACME renewal loop; `agents/est/agent.ps1` + `EstClient.psm1` implement EST bootstrap/enrollment.
 - The control loop is consistent: load config → apply environment overrides → validate → decide → enroll/renew → atomically publish cert/key → log → sleep.
 - `init-volumes.sh` / `init-volumes.ps1` seed step-ca, OpenXPKI config, and the MariaDB schema once so `docker compose up` is deterministic.
-- Observability is baked in: every agent log event is structured JSON shipped via Fluentd → Loki → Grafana for dashboards and troubleshooting.
+- Agents emit structured JSON logs to stdout so they can be inspected with `docker compose logs` or forwarded to your preferred aggregation stack.
 
 > Need deeper detail? Read [docs/ECA_DEVELOPER_GUIDE.md](docs/ECA_DEVELOPER_GUIDE.md) for design diagrams, configuration schema guidance, testing strategy, and the extension checklist.
 
@@ -136,63 +136,42 @@ The ECA PoC demonstrates a **unified PKI architecture** using industry-standard 
 
 ## Documentation
 
-Complete documentation is available in the `docs/` directory:
+### Core
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** – System overview and component responsibilities
+- **[docs/ECA_DEVELOPER_GUIDE.md](docs/ECA_DEVELOPER_GUIDE.md)** – Configuration model, extension guidance, and internal design notes
+- **[docs/PKI_INITIALIZATION.md](docs/PKI_INITIALIZATION.md)** – Step-by-step PKI + EST bootstrap reference
+- **[docs/TESTING.md](docs/TESTING.md)** – Detailed testing strategy and expected outcomes
 
-### 📘 Core Documentation
-- **[HANDOVER.md](HANDOVER.md)** - Complete project handover (start here!)
-- **[ROADMAP.md](ROADMAP.md)** - Development roadmap and milestones (M1-M6)
-- **[ECA_DEVELOPER_GUIDE.md](docs/ECA_DEVELOPER_GUIDE.md)** - Design, configuration, testing, and extension guide
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture and design patterns
-- **[PKI_INITIALIZATION.md](docs/PKI_INITIALIZATION.md)** - PKI setup and initialization guide
-- **[CHANGELOG.md](CHANGELOG.md)** - Complete project history and changes
-
-### 🔧 Deployment & Operations
-- **[WINDOWS_DEPLOYMENT.md](docs/WINDOWS_DEPLOYMENT.md)** - Windows Server deployment guide (M3)
-- **[OBSERVABILITY_WORKFLOW.md](docs/OBSERVABILITY_WORKFLOW.md)** - Observability operations guide (M2)
-- **[CRL_IMPLEMENTATION.md](docs/CRL_IMPLEMENTATION.md)** - CRL/revocation implementation (M5)
-- **[TESTING_QUICKSTART.md](TESTING_QUICKSTART.md)** - Testing guide
-
-### 🌐 Web UI & Dashboards
-- **[web-ui/README.md](web-ui/README.md)** - Interactive Web UI documentation (M4)
-- **[web-ui/TESTING_INSTRUCTIONS.md](web-ui/TESTING_INSTRUCTIONS.md)** - Web UI testing guide
-- **Web UI Access:** http://localhost:8888 (after running `web-ui/quickstart.sh`)
-
-### 🔐 PKI & Protocols
-- **[HANDOVER_UNIFIED_PKI.md](docs/HANDOVER_UNIFIED_PKI.md)** - Unified PKI integration
-- **[EST_AUTOMATION_COMPLETE.md](docs/EST_AUTOMATION_COMPLETE.md)** - EST automation
-- **[ACME Protocol Reference](docs/api/acme_protocol_reference.md)** - RFC 8555 details
-- **[EST Protocol Reference](docs/api/est_protocol_reference.md)** - RFC 7030 details
+### Reference
+- **[ACME Protocol Reference](docs/api/acme_protocol_reference.md)** – Condensed RFC 8555 primer
+- **[EST Protocol Reference](docs/api/est_protocol_reference.md)** – Condensed RFC 7030 primer
+- **[docs/OBSERVABILITY_WORKFLOW.md](docs/OBSERVABILITY_WORKFLOW.md)** – Fluentd → Loki → Grafana stack operations and dashboards
+- Mermaid diagrams backing the architecture live in `docs/diagrams/` (render with https://mermaid.live).
 
 ## Testing
 
-**Status (Oct 2025):**
-- ✅ **Unit suite (108/108 tests)** passes via `./scripts/run-tests.sh -u`
-- ✅ **Integration suite (9/9 tests)** runs via `./scripts/run-tests.sh --auto-start-integration` (auto-starts required PKI/EST stack)
-- ✅ **GitHub Actions** (`.github/workflows/test.yml`) runs unit + integration tests on every push
-- ✅ **Coverage**: 100% of critical paths tested with comprehensive unit test coverage
-
-**Run it yourself**
+Run the test harness from the repository root:
 
 ```bash
-# Fast path: unit tests only
+# Unit tests only
 ./scripts/run-tests.sh -u
 
-# Full suite: automatically start PKI/EST services via docker compose
+# Full suite: automatically start PKI/EST dependencies
 ./scripts/run-tests.sh --auto-start-integration
-
-# Within Docker (consistent CI parity)
-./scripts/run-tests-docker.sh -u
 ```
 
-> **Heads-up:** Integration tests need the following services running: `pki openxpki-db openxpki-server openxpki-client openxpki-web`. The `--auto-start-integration` flag manages them for you; otherwise run `docker compose up -d ...` manually before `./scripts/run-tests.sh -i`.
+```powershell
+pwsh -File scripts/run-tests.ps1 -UnitOnly
+pwsh -File scripts/run-tests.ps1 -IntegrationOnly -AutoStartIntegration
+```
 
-Legacy validation artifacts remain under `docs/testing/validation_results.md`, but they pre-date the new roadmap work.
+Integration runs expect `pki`, `openxpki-db`, `openxpki-server`, `openxpki-client`, and `openxpki-web`. The auto-start flags spin them up and tear them down; otherwise, launch them manually with `docker compose up -d` before invoking the integration switch.
 
 ## Agent Configuration Overrides
 
 - Both agents load `/agent/config.yaml` and then apply environment overrides. Overrides are evaluated first with an agent-specific prefix, then the legacy (unprefixed) variable name to preserve backward compatibility.
 - Set `AGENT_ENV_PREFIX` (or `AGENT_NAME`, which automatically becomes `<AGENT_NAME>_`) to namespace overrides per deployment. This is critical on Windows Server where services often share the same environment block.
-- Example (ACME agent):  
+- Example (ACME agent):
   ```bash
   export AGENT_ENV_PREFIX=mosquitto_eca_jwk_
   export mosquitto_eca_jwk_PKI_URL="https://pki.demo.lan:9443"
@@ -202,54 +181,39 @@ Legacy validation artifacts remain under `docs/testing/validation_results.md`, b
 - All documented overrides follow the `<prefix><UPPER_SNAKE_CASE>` pattern (e.g., `ACME_CERT_PATH`, `EST_DEVICE_NAME`, `mosquitto_eca_jwk_EST_BOOTSTRAP_TOKEN`).
 - Need to onboard a new agent? Follow the checklist in [docs/ECA_DEVELOPER_GUIDE.md](docs/ECA_DEVELOPER_GUIDE.md#4-extending-the-platform-adding-a-new-agent) to define config keys, prefixes, Docker services, and tests without breaking existing deployments.
 
-## Observability Stack
+## Operations & Monitoring
 
-The ECA PoC includes a **production-ready observability stack** (Fluentd → Loki → Grafana) with 4 pre-configured dashboards:
+All containers emit structured logs to stdout/stderr. Inspect them with standard Docker tooling:
 
-1. **ECA - Certificate Lifecycle** - Agent heartbeats, certificate age, lifecycle events
-2. **ECA - Operations** - Log severity distribution, error counts, log volume trends
-3. **ECA - Logs Explorer** - Interactive log search with filters
-4. **ECA - CRL Monitoring** - CRL age, revoked certificates, validation events (M5)
-
-**Quick Start:**
 ```bash
-# Linux/macOS/WSL
-./scripts/observability.sh demo               # Full demo: start stack, verify, generate sample logs
-./scripts/observability.sh verify -v          # Re-run verification only
-```
-```powershell
-# Windows PowerShell
-.\scripts\observability.ps1 demo
-.\scripts\observability.ps1 verify -- -Verbose   # Pass-thru args after `--`
+docker compose logs -f eca-acme-agent
+docker compose logs -f eca-est-agent
 ```
 
-**Grafana Access:**
-- URL: http://localhost:3000
-- Username: `admin`
-- Password: `eca-admin`
-- Change the password via the Grafana UI before sharing the stack outside of local demos.
+To verify artifacts, mount the published volumes locally:
 
-**Documentation:**
-- **[docs/OBSERVABILITY_WORKFLOW.md](docs/OBSERVABILITY_WORKFLOW.md)** - Deep-dive on architecture, operations, and troubleshooting
-- **[OBSERVABILITY_QUICKSTART.md](OBSERVABILITY_QUICKSTART.md)** - Five-minute setup checklist (keep handy for demos)
+```bash
+docker run --rm -v server-certs:/data alpine ls -l /data
+docker run --rm -v client-certs:/data alpine ls -l /data
+```
+
+Dedicated observability is available through Fluentd → Loki → Grafana:
+
+- Start or refresh the stack with `./scripts/observability.sh demo` (PowerShell variant also available).
+- Log in to Grafana at `http://localhost:3000` (`admin` / `eca-admin`) and open the **ECA** dashboards for aggregated agent logs and certificate insights.
+- Use `./scripts/verify-logging.sh` / `.ps1` when you need to troubleshoot the log pipeline end-to-end.
 
 ## Troubleshooting
 
-Common issues and solutions are documented in the following guides:
+- `docs/PKI_INITIALIZATION.md` captures initialization pitfalls and recovery commands.
+- `docs/ECA_DEVELOPER_GUIDE.md` covers configuration validation, renewal thresholds, and agent lifecycle details.
+- `QUICKSTART.md` includes endpoint verification commands for ACME, EST, and the target workloads.
 
-- **[OBSERVABILITY_WORKFLOW.md](docs/OBSERVABILITY_WORKFLOW.md)** - Observability stack troubleshooting
-- **[WINDOWS_DEPLOYMENT.md](docs/WINDOWS_DEPLOYMENT.md)** - Windows-specific issues
-- **[CRL_IMPLEMENTATION.md](docs/CRL_IMPLEMENTATION.md)** - CRL and revocation troubleshooting
-- **[HANDOVER.md](HANDOVER.md)** - Comprehensive troubleshooting guide (section 12)
-
-Common issues:
-- **Certificate expiration**: Check agent logs, verify PKI connectivity, review renewal thresholds
-- **Service connectivity**: Verify Docker network, check firewall rules, test PKI endpoints
-- **Agent logging**: Use `docker compose logs -f <agent>`, verify Fluentd → Loki pipeline
-- **PKI configuration**: Review `pki/config/`, check step-ca logs, validate provisioners
+Typical checks:
+- Verify agents can reach the PKI endpoints (`curl -k https://localhost:9000/health`, `curl -k https://localhost:8443/.well-known/est/cacerts`).
+- Confirm certificates refresh on schedule by inspecting the `NotAfter` values in `server-certs/` and `client-certs/`.
+- Ensure shared volumes (`server-certs`, `client-certs`, `challenge`) are mounted (`docker inspect <container>`).
 
 ---
 
-**Project Status:** ✅ Production-Ready PoC (All Milestones M1-M6 Complete)
-
-For detailed information about the project structure, see the directory layout in `docs/` or refer to the CodeMachine artifacts in `.codemachine/artifacts/plan/`.
+**Project Status:** The PoC now ships only the components required for automated ACME + EST lifecycle management (step-ca, OpenXPKI, agents, target workloads, and tests).

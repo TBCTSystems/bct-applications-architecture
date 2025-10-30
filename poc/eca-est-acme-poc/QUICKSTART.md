@@ -57,10 +57,10 @@ docker compose up -d
 ```
 
 **What this does:**
-- Starts step-ca, OpenXPKI, ACME/EST agents, target server/client, and optional observability components
+- Starts step-ca, OpenXPKI, ACME/EST agents, and the target server/client workloads
 - Agents immediately begin certificate enrollment/renewal loops
 
-Need to demo observability right away? Run `./scripts/observability.sh demo` (or `.ps1`) after the stack is up to start Fluentd + Loki + Grafana, run the health checks, and print the Grafana URL/credentials.
+Need aggregated logs? Run `./scripts/observability.sh demo` (or `.ps1`) to launch Fluentd, Loki, and Grafana with sample data and health checks.
 
 ---
 
@@ -327,24 +327,17 @@ Then re-run the setup from Step 1.
 
 ## Resources
 
-- **Documentation:** `docs/` directory
-- **Architecture:** `docs/01_Plan_Overview_and_Setup.md`
-- **EST Guide:** `docs/EST_IMPLEMENTATION_GUIDE.md`
-- **OpenXPKI Status:** `docs/OPENXPKI_INTEGRATION_FINAL_REPORT.md`
+- **docs/ARCHITECTURE.md** – deeper architecture overview and sequence diagrams
+- **docs/ECA_DEVELOPER_GUIDE.md** – agent configuration details and extension guidance
+- **docs/PKI_INITIALIZATION.md** – full breakdown of what `init-volumes.*` provisions
+- **docs/TESTING.md** – in-depth unit and integration test walkthroughs
 
 ---
 
 ## Support
 
 For issues or questions:
-1. Check `docs/` for detailed documentation
+1. Check the docs above for detailed walkthroughs
 2. Review container logs: `docker compose logs [service-name]`
 3. Verify prerequisites are met
-4. Try a fresh cleanup and re-setup
-
----
-
-**Generated with [Claude Code](https://claude.ai/code) via [Happy](https://happy.engineering)**
-
-**Co-Authored-By: Claude <noreply@anthropic.com>**
-**Co-Authored-By: Happy <yesreply@happy.engineering>**
+4. Try a fresh cleanup and re-setup if volumes get corrupted

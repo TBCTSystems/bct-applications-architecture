@@ -458,6 +458,14 @@ function Initialize-OpenXpkiDatabase {
     Invoke-DockerCompose -Args @('up', '-d', 'openxpki-db') | Out-Null
     Wait-ForContainerHealthy -ContainerName 'eca-openxpki-db'
 
+    $schemaExists = docker exec eca-openxpki-db mariadb -N -uopenxpki -popenxpki `
+        -e "SHOW TABLES LIKE 'aliases'" openxpki
+
+    if ($schemaExists -match 'aliases') {
+        Write-Info "Existing OpenXPKI schema detected – skipping import."
+        return
+    }
+
     Write-Info "Importing OpenXPKI database schema..."
     $schemaContent = & docker run --rm `
         -v "$($script:OpenXpkiConfigVolumeName):/config:ro" `
