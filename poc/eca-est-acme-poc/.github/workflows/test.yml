@@ -1,0 +1,78 @@
+name: ECA Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y powershell
+
+      - name: Install Pester
+        run: |
+          pwsh -Command "Install-Module -Name Pester -MinimumVersion 5.0 -Force -Scope CurrentUser"
+
+      - name: Run Unit Tests with Coverage
+        run: |
+          chmod +x ./scripts/run-tests.sh
+          ./scripts/run-tests.sh -u -c
+
+      - name: Upload Coverage Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: tests/coverage.xml
+
+  integration-tests:
+    name: Integration Tests
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y powershell
+
+      - name: Install Pester
+        run: |
+          pwsh -Command "Install-Module -Name Pester -MinimumVersion 5.0 -Force -Scope CurrentUser"
+
+      - name: Run Integration Tests (auto start stack)
+        run: |
+          chmod +x ./scripts/run-tests.sh
+          ./scripts/run-tests.sh -i -a
+
+      - name: Collect Compose Logs
+        if: failure()
+        run: |
+          docker compose logs > integration-logs.txt || true
+
+      - name: Upload Integration Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs
+          path: integration-logs.txt
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v || true

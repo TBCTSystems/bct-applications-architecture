@@ -1,0 +1,23 @@
+[
+  {
+    "type": "ACME",
+    "name": "acme",
+    "challenges": [
+      "http-01"
+    ],
+    "claims": {
+      "minTLSCertDuration": "5m",
+      "maxTLSCertDuration": "24h",
+      "defaultTLSCertDuration": "10m"
+    }
+  },
+  {
+    "type": "EST",
+    "name": "est-provisioner",
+    "claims": {
+      "minTLSCertDuration": "5m",
+      "maxTLSCertDuration": "24h",
+      "defaultTLSCertDuration": "10m"
+    }
+  }
+]

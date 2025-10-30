@@ -1,0 +1,2 @@
+# This file ensures Git tracks the tests/fixtures/mock-responses/ directory
+# Mock HTTP responses for protocol testing will be placed here

@@ -1,0 +1,15 @@
+# Grafana Dashboard Provisioning
+# Auto-load ECA dashboards on Grafana startup
+
+apiVersion: 1
+
+providers:
+  - name: 'ECA Dashboards'
+    orgId: 1
+    folder: 'ECA PoC'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

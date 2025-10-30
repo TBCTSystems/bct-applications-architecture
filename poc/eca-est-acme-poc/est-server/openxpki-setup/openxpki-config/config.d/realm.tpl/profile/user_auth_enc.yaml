@@ -1,0 +1,59 @@
+# The name of the file equals the name of the profile
+
+label: I18N_OPENXPKI_UI_PROFILE_USER_LABEL
+
+key:
+    generate: client
+
+padding:
+    mode: pss
+    saltlen: 32
+    mgf1_digest: sha256
+
+style:
+    00_user_basic_style:
+        label: I18N_OPENXPKI_UI_PROFILE_BASIC_STYLE_LABEL
+        description: I18N_OPENXPKI_UI_PROFILE_BASIC_STYLE_DESC
+        ui:
+            subject:
+                - username
+                - realname
+                - department
+                - email
+            info:
+                - owner_contact
+                - comment
+
+        subject:
+            dn: CN=[% realname %]+UID=[% username %][% IF department %],DC=[% department %][% END %],DC=Test Deployment,DC=OpenXPKI,DC=org
+            san:
+               email: "[% email.lower %]"
+
+        metadata:
+            requestor: "[% realname %]"
+            email: "[% requestor_email %]"
+            owner_contact: "[% owner_contact || requestor_email %]"
+            department: "[% department %]"
+
+# Profile extensions - set 0/1 as needed
+# Also see sections defined in default.yaml
+extensions:
+    key_usage:
+        critical: 1
+        digital_signature: 1
+        # Make sure that you understood the legal implications
+        # before enabling this one!
+        non_repudiation:   0
+        key_encipherment:  1
+
+    extended_key_usage:
+        critical: 0
+        client_auth:      1
+        email_protection: 1
+        # MS Smartcard Logon
+        1.3.6.1.4.1.311.20.2.2: 1
+
+# Define the input fields you used below here or in template.yaml
+#template:
+
+

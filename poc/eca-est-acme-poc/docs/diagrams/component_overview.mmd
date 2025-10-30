@@ -1,0 +1,32 @@
+```mermaid
+flowchart LR
+    Operator((Operator /\nDeveloper))
+
+    subgraph ECA_System [Edge Certificate Agent PoC System]
+        ACME[ECA-ACME Agent\nPowerShell 7.4]
+        EST[ECA-EST Agent\nPowerShell 7.4]
+        Server[Target Server\nNGINX 1.25]
+        Client[Target Client\nAlpine + curl]
+        PKI[step-ca PKI\nACME + EST Provisioners]
+        UI[Web Dashboard\nNode.js/Express]
+        VolumeServer[(Server Certs Volume\n/certs/server)]
+        VolumeClient[(Client Certs Volume\n/certs/client)]
+    end
+
+    Operator -->|Views status & triggers| UI
+    Operator -->|Reads logs| ACME
+    Operator -->|Reads logs| EST
+
+    ACME -->|ACME protocol| PKI
+    EST -->|EST protocol| PKI
+    ACME -->|Writes cert/key| VolumeServer
+    EST -->|Writes cert/key| VolumeClient
+    UI -->|Manual renew| ACME
+    UI -->|Manual renew| EST
+    UI -->|Reads metadata| VolumeServer
+    UI -->|Reads metadata| VolumeClient
+    Server -->|Reads cert & key| VolumeServer
+    Client -->|Reads cert & key| VolumeClient
+    ACME -->|Reload command| Server
+    Client -->|mTLS request| Server
+```

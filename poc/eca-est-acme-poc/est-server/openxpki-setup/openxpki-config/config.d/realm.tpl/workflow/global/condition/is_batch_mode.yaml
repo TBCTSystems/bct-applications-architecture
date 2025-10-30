@@ -1,0 +1,4 @@
+class: OpenXPKI::Server::Workflow::Condition::IsTrue
+param:
+    key: flag_batch_mode
+

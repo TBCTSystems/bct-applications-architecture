@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!--
+        Edge Certificate Agent PoC - Target Server Demonstration Page
+        Task: I4.T2
+        Purpose: Demonstrates HTTPS connectivity with automated certificate management
+                 and optional mTLS client authentication
+        Created: 2025-10-25
+    -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECA PoC - Target Server</title>
+
+    <style>
+        /* Global styling for demonstration clarity */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #4a90e2;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1em;
+            font-weight: 400;
+        }
+
+        .status-section {
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #4a90e2;
+        }
+
+        h2 {
+            color: #34495e;
+            font-size: 1.5em;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .status-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.1em;
+        }
+
+        .status-indicator {
+            font-size: 1.5em;
+            line-height: 1;
+        }
+
+        .success {
+            color: #27ae60;
+        }
+
+        .info {
+            color: #3498db;
+        }
+
+        .timestamp {
+            background-color: #ecf0f1;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1em;
+            color: #2c3e50;
+            display: inline-block;
+        }
+
+        .explanation {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
+
+        .explanation p {
+            color: #7f8c8d;
+            font-size: 0.95em;
+            line-height: 1.8;
+            margin: 10px 0;
+        }
+
+        .tech-note {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #856404;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            h2 {
+                font-size: 1.3em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Edge Certificate Agent PoC - Target Server</h1>
+            <p class="subtitle">Automated Certificate Lifecycle Management Demonstration</p>
+        </header>
+
+        <main>
+            <!-- Current Date/Time Section -->
+            <div class="status-section">
+                <h2>Current Server Time</h2>
+                <div class="status-content">
+                    <span class="status-indicator">🕐</span>
+                    <span class="timestamp"><script>document.write(new Date());</script></span>
+                </div>
+            </div>
+
+            <!-- HTTPS Connection Status -->
+            <div class="status-section">
+                <h2>Connection Status</h2>
+                <div class="status-content">
+                    <span class="status-indicator success">✓</span>
+                    <span><strong>You are connected via HTTPS</strong></span>
+                </div>
+                <p style="margin-top: 10px; color: #666; font-size: 0.95em;">
+                    This connection is secured using TLS 1.3 protocol with high-security cipher suites.
+                </p>
+            </div>
+
+            <!-- Certificate Status -->
+            <div class="status-section">
+                <h2>Certificate Status</h2>
+                <div class="status-content">
+                    <span class="status-indicator success">✓</span>
+                    <span><strong>Certificate valid</strong></span>
+                </div>
+                <p style="margin-top: 10px; color: #666; font-size: 0.95em;">
+                    Server certificate is automatically managed by the ECA-ACME agent using ACME protocol.
+                    Certificates are renewed before expiration with zero-downtime configuration reloads.
+                </p>
+            </div>
+
+            <!-- mTLS Status -->
+            <div class="status-section">
+                <h2>Mutual TLS (mTLS) Status</h2>
+                <div class="status-content">
+                    <span class="status-indicator info">ℹ</span>
+                    <span><strong>Client certificate validation enabled (optional)</strong></span>
+                </div>
+                <p style="margin-top: 10px; color: #666; font-size: 0.95em;">
+                    This server accepts both standard HTTPS connections and connections with client certificates
+                    issued by the ECA-EST agent. Client certificate authentication is optional for maximum flexibility.
+                </p>
+                <!-- Future enhancement note -->
+                <!-- To display actual client certificate information, enable SSI in nginx.conf and use:
+                     Client DN: <!--# echo var="ssl_client_s_dn" default="None" -->
+                     Verification: <!--# echo var="ssl_client_verify" default="NONE" -->
+                -->
+            </div>
+
+            <!-- Explanation Section -->
+            <div class="explanation">
+                <p>
+                    <strong>About This Demonstration</strong>
+                </p>
+                <p>
+                    This page is served over HTTPS using a server certificate automatically obtained
+                    and renewed by the Edge Certificate Agent's ACME component. The certificate lifecycle
+                    (issuance, renewal, and installation) is fully automated, ensuring continuous service
+                    availability without manual intervention.
+                </p>
+
+                <div class="tech-note">
+                    <strong>Technical Note:</strong>
+                    If accessing via curl, use <code>curl -k https://localhost:443/</code> (insecure mode)
+                    or <code>curl --cacert ./pki/root-ca.crt https://target-server/</code> (with CA certificate)
+                    to bypass certificate validation for the self-signed CA used in this PoC environment.
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

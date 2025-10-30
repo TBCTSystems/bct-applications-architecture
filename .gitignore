@@ -4,3 +4,24 @@ obj/
 .vs/
 *.suo
 *.user
+
+# Node.js dependencies
+node_modules/
+
+# Build and coverage artifacts
+dist/
+build/
+coverage/
+.next/
+out/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Environment and OS files
+.env
+.env.*
+.DS_Store
+.idea/
+*.iml

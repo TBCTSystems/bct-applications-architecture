@@ -1,0 +1,8 @@
+{
+  "ca-url": "https://localhost:9000",
+  "ca-config": "/home/step/config/ca.json",
+  "root": "/home/step/certs/root_ca.crt",
+  "kty": "RSA",
+  "size": 2048,
+  "defaultTLSCertDuration": "10m"
+}

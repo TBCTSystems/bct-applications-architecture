@@ -1,0 +1,68 @@
+# The name of the file equals the name of the profile
+
+label: I18N_OPENXPKI_UI_PROFILE_TLS_CLIENT_LABEL
+
+style:
+    00_basic_style:
+        label: I18N_OPENXPKI_UI_PROFILE_BASIC_STYLE_LABEL
+        description: I18N_OPENXPKI_UI_PROFILE_BASIC_STYLE_DESC
+        ui:
+            subject:
+                - hostname
+                - application_name
+            info:
+                - requestor_realname
+                - requestor_email
+                - requestor_affiliation
+                - owner_contact
+                - comment
+
+        subject:
+            dn: CN=[% hostname %][% IF application_name %]:[% application_name %][% END %],DC=Test Deployment,DC=OpenXPKI,DC=org
+
+        metadata:
+            requestor: "[% requestor_realname %]"
+            email: "[% requestor_email %]"
+            owner_contact: "[% owner_contact || requestor_email %]"
+            entity: "[% hostname FILTER lower %]"
+
+    10_iot_device:
+        label: I18N_OPENXPKI_UI_PROFILE_IOT_DEVICE_STYLE_LABEL
+        description: I18N_OPENXPKI_UI_PROFILE_IOT_DEVICE_STYLE_DESC
+        ui:
+            subject:
+                - serialNumber
+            info:
+                - requestor_realname
+                - requestor_email
+                - requestor_affiliation
+                - owner_contact
+                - comment
+
+        subject:
+            dn: serialNumber=[% serialNumber %],DC=Test Deployment,DC=OpenXPKI,DC=org
+
+        metadata:
+            requestor: "[% requestor_realname %]"
+            email: "[% requestor_email %]"
+            owner_contact: "[% owner_contact || requestor_email %]"
+            entity: "[% serialNumber FILTER lower %]"
+
+    enroll:
+        subject:
+            dn: CN=[% CN.0 %],DC=Test Deployment,DC=OpenXPKI,DC=org
+
+        metadata:
+            server_id: "[% data.server_id %]"
+            entity: "[% CN.0.replace(':.*','') FILTER lower %]"
+
+# Profile extensions - set 0/1 as needed
+extensions:
+    key_usage:
+        critical:          1
+        digital_signature: 1
+
+    extended_key_usage:
+        critical:         0
+        client_auth:      1
+

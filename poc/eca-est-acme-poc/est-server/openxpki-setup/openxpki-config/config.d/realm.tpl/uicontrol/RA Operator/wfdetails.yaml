@@ -1,0 +1,25 @@
+- label: I18N_OPENXPKI_UI_WORKFLOW_ID_LABEL
+  field: id
+  link:
+      page: "workflow!load!wf_id![% id %]"
+      target: top
+
+- label: I18N_OPENXPKI_UI_WORKFLOW_TYPE_LABEL
+  field: type
+
+- label: I18N_OPENXPKI_UI_WORKFLOW_CREATOR_LABEL
+  field: creator
+
+- label: I18N_OPENXPKI_UI_WORKFLOW_STATE_LABEL
+  template: "[% IF state == 'SUCCESS' %]<b>Success</b>[% ELSE %][% state %][% END %]"
+  format: raw
+
+- label: I18N_OPENXPKI_UI_WORKFLOW_HISTORY_ACTION_LABEL
+  field: context.wf_current_action
+
+- label: I18N_OPENXPKI_UI_WORKFLOW_PROC_STATE_LABEL
+  field: proc_state
+
+- label: I18N_OPENXPKI_UI_WORKFLOW_ARCHIVE_AT_LABEL
+  field: archive_at
+  format: timestamp
