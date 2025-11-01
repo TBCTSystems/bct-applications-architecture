@@ -23,7 +23,8 @@
 #
 # Leave empty to use unprefixed environment variables (legacy mode, not recommended for multi-instance).
 # Environment variable override: AGENT_NAME (but typically set in config file for instance identity)
-agent_name: "acme"
+# NOTE: agent_name field removed - not defined in schema. Use env_var_prefix instead.
+# agent_name: "acme"
 
 # PKI Server Configuration
 # ---------------------
@@ -145,7 +146,8 @@ check_interval_sec: 60
 #
 # Default: /challenge
 # Environment variable override: <prefix>CHALLENGE_DIRECTORY (e.g., ACME_CHALLENGE_DIRECTORY)
-challenge_directory: "/challenge"
+# NOTE: challenge_directory field removed - not defined in schema
+# challenge_directory: "/challenge"
 
 # =============================================================================
 # ACME Protocol Configuration
@@ -161,7 +163,8 @@ challenge_directory: "/challenge"
 # Leave empty to create account without contact information.
 #
 # Environment variable override: <prefix>ACME_ACCOUNT_CONTACT_EMAIL (e.g., ACME_ACME_ACCOUNT_CONTACT_EMAIL)
-acme_account_contact_email: ""
+# NOTE: acme_account_contact_email field removed - not defined in schema
+# acme_account_contact_email: ""
 
 # ACME Directory Path
 # -------------------
@@ -174,7 +177,8 @@ acme_account_contact_email: ""
 #
 # Default: /acme/acme/directory (step-ca default)
 # Environment variable override: <prefix>ACME_DIRECTORY_PATH (e.g., ACME_ACME_DIRECTORY_PATH)
-acme_directory_path: "/acme/acme/directory"
+# NOTE: acme_directory_path field removed - not defined in schema
+# acme_directory_path: "/acme/acme/directory"
 
 # Certificate Key Type
 # ---------------------
@@ -192,7 +196,8 @@ acme_directory_path: "/acme/acme/directory"
 #
 # Default: rsa
 # Environment variable override: <prefix>ACME_CERTIFICATE_KEY_TYPE (e.g., ACME_ACME_CERTIFICATE_KEY_TYPE)
-acme_certificate_key_type: "rsa"
+# NOTE: acme_certificate_key_type field removed - not defined in schema
+# acme_certificate_key_type: "rsa"
 
 # Certificate Key Size
 # --------------------
@@ -208,7 +213,8 @@ acme_certificate_key_type: "rsa"
 #
 # Default: 2048
 # Environment variable override: <prefix>ACME_CERTIFICATE_KEY_SIZE (e.g., ACME_ACME_CERTIFICATE_KEY_SIZE)
-acme_certificate_key_size: 2048
+# NOTE: acme_certificate_key_size field removed - not defined in schema
+# acme_certificate_key_size: 2048
 
 # Service Reload Configuration
 # -----------------------------
@@ -217,12 +223,14 @@ acme_certificate_key_size: 2048
 # Service container name (for Docker deployments)
 # The Docker container name to send reload signals to.
 # Environment variable override: <prefix>SERVICE_RELOAD_CONTAINER_NAME (e.g., ACME_SERVICE_RELOAD_CONTAINER_NAME)
-service_reload_container_name: "eca-target-server"
+# NOTE: service_reload_container_name field removed - not defined in schema
+# service_reload_container_name: "eca-target-server"
 
 # Service reload timeout (seconds)
 # Maximum time to wait for service reload operation to complete.
 # Environment variable override: <prefix>SERVICE_RELOAD_TIMEOUT_SECONDS (e.g., ACME_SERVICE_RELOAD_TIMEOUT_SECONDS)
-service_reload_timeout_seconds: 10
+# NOTE: service_reload_timeout_seconds field removed - not defined in schema
+# service_reload_timeout_seconds: 10
 
 # Posh-ACME State Directory
 # -------------------------

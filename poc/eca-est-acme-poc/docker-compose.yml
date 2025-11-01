@@ -194,7 +194,8 @@ services:
       - openxpki-db-socket:/var/run/mysqld/
       - openxpki-download:/var/www/download
       - pki-data:/pki:ro  # Read-only access to step-ca certificates
-      - "/etc/timezone:/etc/timezone:ro"
+      # NOTE: /etc/timezone removed - it's a directory on Fedora, not a file
+      # - "/etc/timezone:/etc/timezone:ro"
       - "/etc/localtime:/etc/localtime:ro"
     healthcheck:
       test: /usr/bin/openxpkictl status server
@@ -294,14 +295,15 @@ services:
       # Docker socket access for triggering NGINX reload via docker exec
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      AGENT_NAME: ${ACME_AGENT_NAME:-acme}
+      # NOTE: AGENT_NAME removed - not defined in schema. Use AGENT_ENV_PREFIX instead
+      # AGENT_NAME: ${ACME_AGENT_NAME:-acme}
       AGENT_ENV_PREFIX: ${ACME_AGENT_PREFIX:-ACME_}
       # Environment configuration (development, staging, production)
-      ACME_ENVIRONMENT: ${ACME_ENVIRONMENT:-development}
+      ENVIRONMENT: ${ACME_ENVIRONMENT:-development}
       # PKI service endpoint
       PKI_URL: ${PKI_URL:-https://pki:9000}
       # Domain name for certificate Subject Alternative Name (SAN)
-      ACME_DOMAIN: ${ACME_DOMAIN:-target-server}
+      DOMAIN_NAME: ${ACME_DOMAIN:-target-server}
       # Certificate lifecycle settings
       CERT_LIFETIME_MINUTES: ${CERT_LIFETIME_MINUTES:-10}
       RENEWAL_THRESHOLD_PCT: ${RENEWAL_THRESHOLD_PCT:-75}
@@ -352,7 +354,8 @@ services:
       # Read-only access to PKI volume for bootstrap certificate
       - pki-data:/home/step:ro
     environment:
-      AGENT_NAME: ${EST_AGENT_NAME:-est}
+      # NOTE: AGENT_NAME removed - not defined in schema. Use AGENT_ENV_PREFIX instead
+      # AGENT_NAME: ${EST_AGENT_NAME:-est}
       AGENT_ENV_PREFIX: ${EST_AGENT_PREFIX:-EST_}
       # OpenXPKI EST server endpoint
       PKI_URL: ${EST_URL:-https://openxpki-web:443}
@@ -360,7 +363,7 @@ services:
       EST_BOOTSTRAP_CERT_PATH: /home/step/bootstrap-certs/bootstrap-client.pem
       EST_BOOTSTRAP_KEY_PATH: /home/step/bootstrap-certs/bootstrap-client.key
       # Device identifier (included in certificate CN)
-      EST_DEVICE_NAME: ${EST_DEVICE_NAME:-client-device-001}
+      DEVICE_NAME: ${EST_DEVICE_NAME:-client-device-001}
       # Certificate lifecycle settings
       CERT_LIFETIME_MINUTES: ${CERT_LIFETIME_MINUTES:-10}
       RENEWAL_THRESHOLD_PCT: ${RENEWAL_THRESHOLD_PCT:-75}

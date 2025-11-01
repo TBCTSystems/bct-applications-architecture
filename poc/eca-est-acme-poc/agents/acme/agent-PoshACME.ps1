@@ -212,7 +212,19 @@ function Initialize-PoshAcmeEnvironment {
         $serverArgs = @{ DirectoryUrl = $directoryUrl }
 
         # Skip certificate check for development/self-signed certificates
-        if ($Config.environment -eq 'development' -or $Config.ContainsKey('skip_certificate_check') -and $Config.skip_certificate_check) {
+        # Check if skip_certificate_check is explicitly set in pki_environments for current environment
+        $skipCert = $false
+        if ($Config.pki_environments -and $Config.pki_environments.ContainsKey($Config.environment)) {
+            $envConfig = $Config.pki_environments[$Config.environment]
+            if ($envConfig.ContainsKey('skip_certificate_check')) {
+                $skipCert = $envConfig.skip_certificate_check
+            }
+        }
+
+        if ($skipCert) {
+            Write-LogInfo -Message "Skipping certificate validation for ${Config.environment} environment" -Context @{
+                environment = $Config.environment
+            }
             $serverArgs.Add("SkipCertificateCheck", $true)
         }
 

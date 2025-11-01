@@ -216,6 +216,11 @@ copy_pki_to_volume() {
 
     # Use a temporary container to copy files to the volume
     # This ensures correct permissions and ownership
+
+    #files in TEMP_PKI_DIR not permissible to be copied from the container.
+    # brute forced it to prove the fix.
+    chmod -R 777 "${TEMP_PKI_DIR}"
+
     docker run --rm \
         -v "${VOLUME_PKI}:/home/step" \
         -v "${TEMP_PKI_DIR}:/source:ro" \
