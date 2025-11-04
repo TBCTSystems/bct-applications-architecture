@@ -406,6 +406,35 @@
       },
       "required": [],
       "additionalProperties": false
+    },
+    "windows_certificate_store": {
+      "type": "object",
+      "description": "Windows Certificate Store integration settings. Only applicable when running on Windows. Automatically imports issued certificates to the Windows Certificate Store for seamless integration with Windows applications and services.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic import of certificates to Windows Certificate Store. When enabled, certificates are imported as PFX with private key to enable SSL/TLS binding in IIS and other Windows services."
+        },
+        "store_location": {
+          "type": "string",
+          "enum": ["LocalMachine", "CurrentUser"],
+          "default": "LocalMachine",
+          "description": "Certificate store location. LocalMachine stores are system-wide and accessible by services. CurrentUser stores are per-user and not accessible by services."
+        },
+        "store_name": {
+          "type": "string",
+          "default": "My",
+          "description": "Certificate store name. 'My' is the personal certificate store where SSL certificates are typically installed. Other common stores include 'Root', 'CA', and 'TrustedPeople'."
+        },
+        "pfx_password": {
+          "type": "string",
+          "default": "",
+          "description": "Password for in-memory PFX creation. If empty, a random password is generated. The PFX is created in memory and imported directly to the certificate store without writing to disk."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

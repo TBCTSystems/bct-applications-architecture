@@ -337,6 +337,211 @@ function Save-CertificateFiles {
 }
 
 # ============================================================================
+# WINDOWS CERTIFICATE STORE FUNCTIONS
+# ============================================================================
+
+function Import-CertificateToWindowsStore {
+    <#
+    .SYNOPSIS
+        Imports certificate with full chain and private key to Windows Certificate Store as PFX.
+
+    .DESCRIPTION
+        Creates a PFX in memory containing the full certificate chain (leaf + intermediates) 
+        and private key, then imports it to the Windows Certificate Store. Windows automatically
+        distributes certificates to appropriate stores:
+        - Leaf certificate with private key → LocalMachine\My (or specified store)
+        - Intermediate CA certificates → LocalMachine\CA
+        
+        Removes any existing certificates with the same subject from the store first to avoid 
+        duplicates. No temporary files are created. This ensures proper certificate chain 
+        validation and enables mTLS client certificate validation.
+
+    .PARAMETER CertPath
+        Path to the certificate file (.crt or .pem) containing full chain
+
+    .PARAMETER KeyPath
+        Path to the private key file (.key or .pem)
+
+    .PARAMETER PfxPassword
+        Password to protect the PFX file (optional, defaults to random password)
+
+    .PARAMETER StoreName
+        Certificate store name (default: "My")
+
+    .PARAMETER StoreLocation
+        Certificate store location (default: "LocalMachine")
+
+    .OUTPUTS
+        System.Boolean - True if import successful, False otherwise
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CertPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$KeyPath,
+
+        [string]$PfxPassword = (New-Guid).ToString(),
+
+        [string]$StoreName = "My",
+
+        [string]$StoreLocation = "LocalMachine"
+    )
+
+    try {
+        # Only run on Windows
+        if (-not $IsWindows -and $PSVersionTable.PSVersion.Major -ge 6) {
+            Write-LogDebug -Message "Skipping Windows Certificate Store import - not running on Windows"
+            return $true
+        }
+
+        Write-LogInfo -Message "Importing certificate to Windows Certificate Store" -Context @{
+            cert_path = $CertPath
+            store_location = $StoreLocation
+            store_name = $StoreName
+        }
+
+        # Verify files exist
+        if (-not (Test-Path $CertPath)) {
+            Write-LogError -Message "Certificate file not found" -Context @{ path = $CertPath }
+            return $false
+        }
+
+        if (-not (Test-Path $KeyPath)) {
+            Write-LogError -Message "Private key file not found" -Context @{ path = $KeyPath }
+            return $false
+        }
+
+        # Read certificate to get subject for cleanup
+        $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($CertPath)
+        $subject = $cert.Subject
+
+        Write-LogDebug -Message "Certificate subject identified" -Context @{
+            subject = $subject
+            thumbprint = $cert.Thumbprint
+        }
+
+        # Open certificate store
+        $store = [System.Security.Cryptography.X509Certificates.X509Store]::new($StoreName, $StoreLocation)
+        $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+
+        try {
+            # Remove existing certificates with the same subject
+            $existingCerts = $store.Certificates | Where-Object { $_.Subject -eq $subject }
+            foreach ($existingCert in $existingCerts) {
+                Write-LogInfo -Message "Removing existing certificate from store" -Context @{
+                    subject = $existingCert.Subject
+                    thumbprint = $existingCert.Thumbprint
+                    not_after = $existingCert.NotAfter
+                }
+                $store.Remove($existingCert)
+            }
+
+            # Read certificate and private key content
+            $certContent = Get-Content $CertPath -Raw
+            $keyContent = Get-Content $KeyPath -Raw
+
+            # Create certificate collection with full chain using .NET classes
+            $rsa = $null
+            $leafCert = $null
+            $certWithKey = $null
+            $certCollection = $null
+            $pfxCert = $null
+            
+            try {
+                # Parse all certificates from the file (full chain)
+                $certCollection = [System.Security.Cryptography.X509Certificates.X509Certificate2Collection]::new()
+                $certBlocks = [regex]::Matches($certContent, "-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----", [System.Text.RegularExpressions.RegexOptions]::Singleline)
+                
+                Write-LogDebug -Message "Parsing certificate chain" -Context @{
+                    cert_count = $certBlocks.Count
+                }
+
+                # Import all certificates from the chain
+                foreach ($match in $certBlocks) {
+                    $certBlock = "-----BEGIN CERTIFICATE-----" + $match.Groups[1].Value + "-----END CERTIFICATE-----"
+                    $certBytes = [System.Text.Encoding]::UTF8.GetBytes($certBlock)
+                    $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certBytes)
+                    $certCollection.Add($cert)
+                    
+                    Write-LogDebug -Message "Added certificate to collection" -Context @{
+                        subject = $cert.Subject
+                        issuer = $cert.Issuer
+                    }
+                }
+
+                # Get the leaf certificate (first in chain)
+                $leafCert = $certCollection[0]
+                
+                # Import private key and attach to leaf certificate
+                $rsa = [System.Security.Cryptography.RSA]::Create()
+                $rsa.ImportFromPem($keyContent)
+                $certWithKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::CopyWithPrivateKey($leafCert, $rsa)
+
+                # Replace leaf certificate in collection with the one that has private key
+                $certCollection.RemoveAt(0)
+                $certCollection.Insert(0, $certWithKey)
+
+                # Export full collection as PFX bytes (in memory only)
+                $pfxBytes = $certCollection.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $PfxPassword)
+                
+                Write-LogInfo -Message "Created PFX with full certificate chain" -Context @{
+                    cert_count = $certCollection.Count
+                    leaf_subject = $certWithKey.Subject
+                }
+
+                # Import PFX directly from memory to certificate store
+                $pfxCert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxBytes, $PfxPassword, 
+                    [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet -bor
+                    [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet)
+
+                $store.Add($pfxCert)
+
+                Write-LogInfo -Message "Certificate imported to Windows Certificate Store successfully" -Context @{
+                    subject = $pfxCert.Subject
+                    thumbprint = $pfxCert.Thumbprint
+                    not_after = $pfxCert.NotAfter
+                    store_location = $StoreLocation
+                    store_name = $StoreName
+                }
+
+                return $true
+
+            }
+            finally {
+                # Clean up cryptographic objects
+                if ($rsa) { $rsa.Dispose() }
+                if ($leafCert) { $leafCert.Dispose() }
+                if ($certWithKey) { $certWithKey.Dispose() }
+                if ($pfxCert) { $pfxCert.Dispose() }
+                if ($certCollection) {
+                    foreach ($c in $certCollection) {
+                        if ($c) { $c.Dispose() }
+                    }
+                    $certCollection.Clear()
+                }
+            }
+        }
+        finally {
+            $store.Close()
+            $store.Dispose()
+        }
+    }
+    catch {
+        Write-LogError -Message "Failed to import certificate to Windows Certificate Store" -Context @{
+            error = $_.Exception.Message
+            cert_path = $CertPath
+            key_path = $KeyPath
+        }
+        return $false
+    }
+    finally {
+        if ($cert) { $cert.Dispose() }
+    }
+}
+
+# ============================================================================
 # MAIN FUNCTIONS (NATIVE POSH-ACME)
 # ============================================================================
 
@@ -769,6 +974,38 @@ function Invoke-CertificateRenewal {
 
         if (-not $saveResult) {
             throw "Failed to save certificate files"
+        }
+
+        # STEP 6.5: Import certificate to Windows Certificate Store (if on Windows)
+        if ($Config.ContainsKey('windows_certificate_store') -and $Config.windows_certificate_store.enabled) {
+            Write-LogDebug -Message "Importing certificate to Windows Certificate Store"
+
+            $importParams = @{
+                CertPath = $Config.cert_path
+                KeyPath = $Config.key_path
+            }
+
+            if ($Config.windows_certificate_store.ContainsKey('store_location') -and -not [string]::IsNullOrWhiteSpace($Config.windows_certificate_store.store_location)) {
+                $importParams['StoreLocation'] = $Config.windows_certificate_store.store_location
+            }
+
+            if ($Config.windows_certificate_store.ContainsKey('store_name') -and -not [string]::IsNullOrWhiteSpace($Config.windows_certificate_store.store_name)) {
+                $importParams['StoreName'] = $Config.windows_certificate_store.store_name
+            }
+
+            if ($Config.windows_certificate_store.ContainsKey('pfx_password') -and -not [string]::IsNullOrWhiteSpace($Config.windows_certificate_store.pfx_password)) {
+                $importParams['PfxPassword'] = $Config.windows_certificate_store.pfx_password
+            }
+
+            $windowsImportResult = Import-CertificateToWindowsStore @importParams
+
+            if ($windowsImportResult) {
+                Write-LogInfo -Message "Certificate imported to Windows Certificate Store successfully"
+            } else {
+                Write-LogWarn -Message "Windows Certificate Store import failed - certificate files saved but not imported to store"
+            }
+        } else {
+            Write-LogDebug -Message "Windows Certificate Store import disabled or not configured"
         }
 
         # STEP 7: Reload NGINX service

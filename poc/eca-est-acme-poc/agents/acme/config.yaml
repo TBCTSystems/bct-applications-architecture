@@ -311,4 +311,22 @@ certificate_chain:
     # Set file permissions for chain files
     chain_file_permissions: "0644"
 
+# =============================================================================
+# Windows Certificate Store Configuration
+# =============================================================================
+# Windows Certificate Store integration settings (Windows only)
+windows_certificate_store:
+  # Enable automatic import of certificates to Windows Certificate Store
+  enabled: true
+
+  # Certificate store location (LocalMachine or CurrentUser)
+  store_location: "LocalMachine"
+
+  # Certificate store name (typically "My" for personal certificates)
+  store_name: "My"
+
+  # PFX password for in-memory PFX creation (optional, random if not set)
+  # Environment variable override: <prefix>WINDOWS_CERT_STORE_PFX_PASSWORD
+  pfx_password: ""
+
 
