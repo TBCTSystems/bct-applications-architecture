@@ -408,8 +408,8 @@ services:
     volumes:
       # Server certificates from ACME agent (read-write to allow bootstrap cert creation)
       - server-certs:/certs/server
-      # ACME HTTP-01 challenge directory (read-only)
-      - challenge:/challenge:ro
+      # ACME HTTP-01 challenge directory (bind mount for local agent)
+      - C:/temp/challenge:/challenge
       # Note: NGINX configuration will be added in later tasks
       # Configuration should reference /certs/server/cert.pem and /certs/server/key.pem
     depends_on:
@@ -619,3 +619,4 @@ services:
       loki:
         condition: service_healthy
     restart: unless-stopped
+

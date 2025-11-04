@@ -306,7 +306,9 @@ certificate_chain:
     install_leaf_only: false
 
     # Create separate chain files for debugging
-    create_separate_chain_files: true
+    create_separate_chain_files: false
 
     # Set file permissions for chain files
     chain_file_permissions: "0644"
+
+

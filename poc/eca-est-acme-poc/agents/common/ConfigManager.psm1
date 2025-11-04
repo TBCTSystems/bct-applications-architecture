@@ -592,8 +592,13 @@ function Read-AgentConfig {
     Apply-ConfigDefaults -Config $config
 
     # 5. Validate configuration against JSON Schema
-    # Use absolute path for schema file (Docker container layout)
-    $schemaPath = '/config/agent_config_schema.json'
+    # Support both Docker and local Windows execution via environment variable
+    $schemaPath = if ($env:AGENT_CONFIG_SCHEMA_PATH) {
+        $env:AGENT_CONFIG_SCHEMA_PATH
+    } else {
+        '/config/agent_config_schema.json'  # Default for Docker container
+    }
+    
     try {
         Invoke-SchemaValidation -Config $config -SchemaPath $schemaPath
     }

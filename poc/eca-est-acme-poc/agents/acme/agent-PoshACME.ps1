@@ -207,13 +207,37 @@ function Initialize-PoshAcmeEnvironment {
         Write-LogInfo -Message "Configuring Posh-ACME server" -Context @{
             directory_url = $directoryUrl
             environment = $Config.environment
+            pki_url = $Config.pki_url
+            directory_path = $directoryPath
         }
 
         $serverArgs = @{ DirectoryUrl = $directoryUrl }
 
         # Skip certificate check for development/self-signed certificates
-        if ($Config.environment -eq 'development' -or $Config.ContainsKey('skip_certificate_check') -and $Config.skip_certificate_check) {
+        # Check environment-specific setting or default to true for development
+        $skipCertCheck = $false
+        if ($Config.environment -eq 'development') {
+            # For development, default to skipping cert check
+            $skipCertCheck = $true
+            
+            # Check if explicitly configured in pki_environments
+            if ($Config.ContainsKey('pki_environments') -and 
+                $Config.pki_environments.ContainsKey('development') -and
+                $Config.pki_environments.development.ContainsKey('skip_certificate_check')) {
+                $skipCertCheck = $Config.pki_environments.development.skip_certificate_check
+            }
+        }
+        
+        if ($skipCertCheck) {
+            Write-LogInfo -Message "Skipping SSL certificate validation for development" -Context @{
+                environment = $Config.environment
+                skip_cert_check = $true
+            }
             $serverArgs.Add("SkipCertificateCheck", $true)
+        }
+
+        Write-LogDebug -Message "Calling Set-PAServer" -Context @{
+            server_args = ($serverArgs | ConvertTo-Json -Compress)
         }
 
         Set-PAServer @serverArgs
@@ -584,12 +608,14 @@ function Invoke-CertificateRenewal {
 
             if ($keyType -eq 'rsa') {
                 $keySize = if ($Config.ContainsKey('acme_certificate_key_size')) { $Config.acme_certificate_key_size } else { 2048 }
-                $orderParams['KeyLength'] = "rsa$keySize"
+                # Posh-ACME expects integer for RSA keys (e.g., 2048, 4096)
+                $orderParams['KeyLength'] = [int]$keySize
                 Write-LogDebug -Message "Using RSA key for certificate" -Context @{ key_size = $keySize }
             }
             elseif ($keyType -eq 'ec') {
                 $keySize = if ($Config.ContainsKey('acme_certificate_key_size')) { $Config.acme_certificate_key_size } else { 256 }
-                $orderParams['KeyLength'] = "ec$keySize"
+                # Posh-ACME expects 'ec-256', 'ec-384', or 'ec-521' for EC keys
+                $orderParams['KeyLength'] = "ec-$keySize"
                 Write-LogDebug -Message "Using EC key for certificate" -Context @{ key_size = $keySize }
             }
         }
@@ -683,11 +709,19 @@ function Invoke-CertificateRenewal {
             Start-Sleep -Seconds $pollInterval
         }
 
-        # STEP 4: Finalize order
+        # Refresh order status before finalization
         $finalOrder = Get-PAOrder -MainDomain $Config.domain_name -Refresh
+        Write-LogDebug -Message "Order status before finalization: $($finalOrder.status)"
 
+        # STEP 4: Finalize order
         if ($finalOrder.status -eq 'ready') {
-            Write-LogInfo -Message "Finalizing order"
+            Write-LogDebug -Message "Finalizing order (status: $($finalOrder.status))"
+            # Ensure this order is set as the current order before finalizing
+            # and force a refresh to sync Posh-ACME's internal state
+            $null = Set-PAOrder -MainDomain $Config.domain_name
+            $null = Get-PAOrder -Refresh
+            
+            # Now the internal state should match what we see
             Submit-OrderFinalize | Out-Null
 
             # Poll for finalization completion
@@ -701,8 +735,17 @@ function Invoke-CertificateRenewal {
             }
         }
 
+        # Refresh order one final time before validation check
+        $finalOrder = Get-PAOrder -MainDomain $Config.domain_name -Refresh
+        
         if ($finalOrder.status -ne 'valid') {
-            throw "Order did not become valid. Final status: $($finalOrder.status)"
+            $statusInfo = if ($finalOrder.status) { $finalOrder.status } else { "(null/empty)" }
+            Write-LogError -Message "Order finalization failed" -Context @{
+                expected_status = "valid"
+                actual_status = $statusInfo
+                domain = $Config.domain_name
+            }
+            throw "Order did not become valid. Final status: $statusInfo"
         }
 
         # STEP 5: Complete order and get certificate
@@ -813,11 +856,25 @@ function Start-AcmeAgent {
         # Load configuration
         # ConfigManager will automatically read agent_name from the config file
         # and use it to build the environment variable prefix (e.g., "acme-app1" -> "ACME_APP1_")
+        
+        # Support both Docker and local Windows execution via environment variable
+        $configPath = if ($env:AGENT_CONFIG_PATH) { 
+            $env:AGENT_CONFIG_PATH 
+        } else { 
+            "/agent/config.yaml"  # Default for Docker container
+        }
+        
         Write-LogInfo -Message "Loading configuration" -Context @{
-            config_path = "/agent/config.yaml"
+            config_path = $configPath
         }
 
-        $config = Read-AgentConfig -ConfigFilePath "/agent/config.yaml"
+        # Load configuration with ACME_ prefix for environment variable overrides
+        $config = Read-AgentConfig -ConfigFilePath $configPath -EnvVarPrefixes @("ACME_", "")
+
+        Write-LogDebug -Message "Raw config after loading" -Context @{
+            pki_url = $config.pki_url
+            acme_directory_path = if ($config.ContainsKey('acme_directory_path')) { $config.acme_directory_path } else { "(not set)" }
+        }
 
         Write-LogInfo -Message "Configuration loaded successfully" -Context @{
             agent_name = if ($config.ContainsKey('agent_name')) { $config.agent_name } else { "(none)" }

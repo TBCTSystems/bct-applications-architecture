@@ -391,31 +391,49 @@ function Read-Certificate {
             throw "Certificate file not found: $Path"
         }
 
-        # PowerShell's X509Certificate2 constructor cannot parse PEM text directly
-        # and ImportFromPem() is not available in all .NET versions
-        # Solution: Use openssl to convert PEM to DER format, then load DER bytes
+        # Read the certificate file
+        $certContent = Get-Content -Path $Path -Raw
 
-        # Create temporary DER file
-        $tempDerFile = [System.IO.Path]::GetTempFileName()
-        try {
-            # Convert PEM to DER using openssl
-            $null = & openssl x509 -in $Path -outform DER -out $tempDerFile 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                throw "openssl x509 conversion failed with exit code $LASTEXITCODE"
+        # Check if it's a PEM certificate
+        if ($certContent -match '-----BEGIN CERTIFICATE-----') {
+            # Try using ImportFromPem if available (.NET 5.0+)
+            $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new()
+            
+            try {
+                # .NET 5.0+ method
+                if ($cert.PSObject.Methods['ImportFromPem']) {
+                    $cert.ImportFromPem($certContent)
+                    return $cert
+                }
+            } catch {
+                # ImportFromPem not available or failed, try alternative method
             }
-
-            # Read DER bytes and create X509Certificate2
-            $certBytes = [System.IO.File]::ReadAllBytes($tempDerFile)
+            
+            # Alternative: Extract ONLY the first certificate from the file
+            # (file may contain full chain with multiple certificates)
+            $firstCertMatch = [regex]::Match($certContent, '-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----', 
+                                             [System.Text.RegularExpressions.RegexOptions]::Singleline)
+            
+            if (-not $firstCertMatch.Success) {
+                throw "No valid PEM certificate found in file"
+            }
+            
+            # Get the base64 content (between BEGIN and END)
+            $base64 = $firstCertMatch.Groups[1].Value -replace '\s', ''
+            
+            # Convert base64 to bytes
+            $certBytes = [Convert]::FromBase64String($base64)
+            
+            # Create certificate from bytes
             $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certBytes)
+            return $cert
         }
-        finally {
-            # Clean up temporary file
-            if (Test-Path $tempDerFile) {
-                Remove-Item -Path $tempDerFile -ErrorAction SilentlyContinue
-            }
+        else {
+            # Assume DER format, load directly
+            $certBytes = [System.IO.File]::ReadAllBytes($Path)
+            $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certBytes)
+            return $cert
         }
-
-        return $cert
     }
     catch {
         throw "Failed to read certificate from '$Path': $($_.Exception.Message)"

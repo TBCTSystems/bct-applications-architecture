@@ -17,6 +17,28 @@
       "description": "Deployment environment for the agent. Controls which PKI environment configuration to use and affects logging levels, validation strictness, and security settings. Each environment has its own PKI URL, timeout settings, and SSL certificate validation preferences. This enables the same configuration to be used across different deployment stages with environment-specific behavior.",
       "examples": ["development", "staging", "production"]
     },
+    "agent_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this agent instance used to derive environment variable prefix. For multi-instance deployments (multiple agents on same host), each agent must have a unique agent_name to avoid configuration collisions. The agent_name is automatically converted to uppercase and used as the prefix for environment variable overrides (e.g., agent_name: 'acme-app1' results in ACME_APP1_PKI_URL, ACME_APP1_CERT_PATH, etc.). Leave empty to use unprefixed environment variables (legacy mode).",
+      "examples": [
+        "acme",
+        "acme-app1",
+        "acme-app2",
+        "est-client"
+      ]
+    },
+    "challenge_directory": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Directory path where ACME HTTP-01 challenge files are written. This directory must be accessible by the ACME CA via HTTP at /.well-known/acme-challenge/. Typically mapped to a web server document root. Required for ACME HTTP-01 challenge validation.",
+      "examples": [
+        "/var/www/html/.well-known/acme-challenge",
+        "/usr/share/nginx/html/.well-known/acme-challenge",
+        "/challenge",
+        "C:\\inetpub\\wwwroot\\.well-known\\acme-challenge"
+      ]
+    },
     "pki_environments": {
       "type": "object",
       "description": "Environment-specific PKI server configurations. Allows the agent to connect to different PKI endpoints based on the selected environment. Each environment can have its own URL, timeout settings, and SSL validation requirements. This supports development, staging, and production workflows with different certificate authorities or configurations.",
@@ -137,6 +159,60 @@
         "web-service.example.com",
         "*.example.com"
       ]
+    },
+    "acme_account_contact_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Contact email address for ACME account registration. Used by the ACME CA to send notifications about certificate expiration, policy changes, or account issues. Optional for ACME agents - if not provided, account registration may still succeed depending on CA policy. Some CAs require a contact email for production use.",
+      "examples": [
+        "admin@example.com",
+        "certificates@company.com",
+        "devops-team@organization.org"
+      ]
+    },
+    "acme_directory_path": {
+      "type": "string",
+      "minLength": 1,
+      "default": "/acme/acme/directory",
+      "description": "Path component of the ACME directory URL relative to the PKI base URL. For step-ca, this is typically '/acme/acme/directory' where the first 'acme' is the provisioner name and the second 'acme' is the ACME protocol endpoint. Full directory URL is constructed as {pki_url}{acme_directory_path}.",
+      "examples": [
+        "/acme/acme/directory",
+        "/directory",
+        "/acme/my-provisioner/directory"
+      ]
+    },
+    "acme_certificate_key_type": {
+      "type": "string",
+      "enum": ["rsa", "ec"],
+      "default": "rsa",
+      "description": "Cryptographic algorithm for certificate private key generation. 'rsa' for RSA keys (size controlled by acme_certificate_key_size), 'ec' for Elliptic Curve keys (P-256 or P-384 based on key_size). RSA is widely compatible, EC provides better performance with smaller keys.",
+      "examples": ["rsa", "ec"]
+    },
+    "acme_certificate_key_size": {
+      "type": "integer",
+      "enum": [256, 384, 2048, 4096],
+      "default": 2048,
+      "description": "Key size in bits for certificate private key generation. For RSA keys: 2048 (standard) or 4096 (enhanced security). For EC keys: 256 (P-256 curve) or 384 (P-384 curve).",
+      "examples": [2048, 4096, 256, 384]
+    },
+    "service_reload_container_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Docker container name to send reload signals to after certificate renewal. Used in Docker deployments to reload services (e.g., NGINX, Apache) with updated certificates. The agent will execute docker exec commands against this container.",
+      "examples": [
+        "eca-target-server",
+        "nginx-server",
+        "web-server",
+        "application-container"
+      ]
+    },
+    "service_reload_timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 300,
+      "default": 10,
+      "description": "Maximum time in seconds to wait for service reload operation to complete. If the reload command does not finish within this timeout, it will be considered failed and an error will be logged.",
+      "examples": [10, 30, 60]
     },
     "device_name": {
       "type": "string",
