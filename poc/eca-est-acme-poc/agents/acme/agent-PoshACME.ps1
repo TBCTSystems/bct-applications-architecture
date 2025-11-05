@@ -492,9 +492,11 @@ function Import-CertificateToWindowsStore {
                 }
 
                 # Import PFX directly from memory to certificate store
+                # Include Exportable flag to allow private key export for PEM conversion
                 $pfxCert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxBytes, $PfxPassword, 
                     [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet -bor
-                    [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet)
+                    [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor
+                    [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
 
                 $store.Add($pfxCert)
 
@@ -538,6 +540,200 @@ function Import-CertificateToWindowsStore {
     }
     finally {
         if ($cert) { $cert.Dispose() }
+    }
+}
+
+function Export-CertificateFromWindowsStore {
+    <#
+    .SYNOPSIS
+        Exports certificates from Windows Certificate Store to PEM files.
+
+    .DESCRIPTION
+        Retrieves the leaf certificate and intermediate CA certificate from Windows 
+        Certificate Store and exports them to separate PEM files in the specified directory.
+        
+        Files exported:
+        - server.crt: Leaf certificate (PEM format)
+        - server.key: Private key (PEM format)
+        - ca-{domain}.crt: Intermediate CA certificate (PEM format)
+
+    .PARAMETER Subject
+        Certificate subject (CN) to search for in the store
+
+    .PARAMETER DomainName
+        Domain name used for CA filename pattern replacement
+
+    .PARAMETER ExportPath
+        Base directory path for exported PEM files
+
+    .PARAMETER CertFilename
+        Filename for the leaf certificate (default: "server.crt")
+
+    .PARAMETER KeyFilename
+        Filename for the private key (default: "server.key")
+
+    .PARAMETER CaFilenamePattern
+        Filename pattern for CA certificate with {domain} placeholder (default: "ca-{domain}.crt")
+
+    .PARAMETER StoreName
+        Certificate store name (default: "My")
+
+    .PARAMETER StoreLocation
+        Certificate store location (default: "LocalMachine")
+
+    .OUTPUTS
+        System.Boolean - True if export successful, False otherwise
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Subject,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DomainName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ExportPath,
+
+        [string]$CertFilename = "server.crt",
+
+        [string]$KeyFilename = "server.key",
+
+        [string]$CaFilenamePattern = "ca-{domain}.crt",
+
+        [string]$StoreName = "My",
+
+        [string]$StoreLocation = "LocalMachine"
+    )
+
+    try {
+        # Only run on Windows
+        if (-not $IsWindows -and $PSVersionTable.PSVersion.Major -ge 6) {
+            Write-LogDebug -Message "Skipping Windows Certificate Store export - not running on Windows"
+            return $true
+        }
+
+        Write-LogInfo -Message "Exporting certificates from Windows Certificate Store to PEM" -Context @{
+            export_path = $ExportPath
+            subject = $Subject
+        }
+
+        # Create export directory if it doesn't exist
+        if (-not (Test-Path -Path $ExportPath)) {
+            Write-LogDebug -Message "Creating export directory" -Context @{ path = $ExportPath }
+            New-Item -ItemType Directory -Path $ExportPath -Force | Out-Null
+        }
+
+        # Open LocalMachine\My store to get leaf certificate with private key
+        $myStore = [System.Security.Cryptography.X509Certificates.X509Store]::new($StoreName, $StoreLocation)
+        $myStore.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+
+        try {
+            # Find the leaf certificate with matching subject
+            $leafCert = $myStore.Certificates | Where-Object { 
+                $_.Subject -eq $Subject -and $_.HasPrivateKey 
+            } | Select-Object -First 1
+
+            if (-not $leafCert) {
+                Write-LogError -Message "Certificate not found in store" -Context @{
+                    subject = $Subject
+                    store = "$StoreLocation\$StoreName"
+                }
+                return $false
+            }
+
+            Write-LogDebug -Message "Found leaf certificate" -Context @{
+                subject = $leafCert.Subject
+                thumbprint = $leafCert.Thumbprint
+                has_private_key = $leafCert.HasPrivateKey
+            }
+
+            # Export leaf certificate to PEM
+            $certPath = Join-Path -Path $ExportPath -ChildPath $CertFilename
+            $certPem = "-----BEGIN CERTIFICATE-----`n"
+            $certPem += [Convert]::ToBase64String($leafCert.RawData, [System.Base64FormattingOptions]::InsertLineBreaks)
+            $certPem += "`n-----END CERTIFICATE-----`n"
+            
+            [System.IO.File]::WriteAllText($certPath, $certPem, [System.Text.Encoding]::ASCII)
+            Write-LogInfo -Message "Exported leaf certificate" -Context @{ path = $certPath }
+
+            # Export private key to PEM (if available)
+            if ($leafCert.HasPrivateKey) {
+                $keyPath = Join-Path -Path $ExportPath -ChildPath $KeyFilename
+                
+                try {
+                    # Get the private key
+                    $privateKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($leafCert)
+                    
+                    if ($privateKey) {
+                        # Export as PKCS#8 PEM
+                        $keyPem = $privateKey.ExportPkcs8PrivateKeyPem()
+                        [System.IO.File]::WriteAllText($keyPath, $keyPem, [System.Text.Encoding]::ASCII)
+                        Write-LogInfo -Message "Exported private key" -Context @{ path = $keyPath }
+                    } else {
+                        Write-LogWarn -Message "Private key not exportable" -Context @{ subject = $Subject }
+                    }
+                } catch {
+                    Write-LogError -Message "Failed to export private key" -Context @{
+                        error = $_.Exception.Message
+                        subject = $Subject
+                    }
+                }
+            }
+
+        } finally {
+            $myStore.Close()
+            $myStore.Dispose()
+        }
+
+        # Open LocalMachine\CA store to get intermediate certificate
+        $caStore = [System.Security.Cryptography.X509Certificates.X509Store]::new("CA", $StoreLocation)
+        $caStore.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+
+        try {
+            # Find intermediate CA certificate (issued by root, issuer of our leaf cert)
+            $intermediateCert = $caStore.Certificates | Where-Object {
+                $_.Subject -match "Intermediate" -or $_.Subject -eq $leafCert.Issuer
+            } | Select-Object -First 1
+
+            if ($intermediateCert) {
+                # Replace {domain} placeholder in filename pattern
+                $caFilename = $CaFilenamePattern -replace '\{domain\}', $DomainName
+                $caPath = Join-Path -Path $ExportPath -ChildPath $caFilename
+
+                $caPem = "-----BEGIN CERTIFICATE-----`n"
+                $caPem += [Convert]::ToBase64String($intermediateCert.RawData, [System.Base64FormattingOptions]::InsertLineBreaks)
+                $caPem += "`n-----END CERTIFICATE-----`n"
+                
+                [System.IO.File]::WriteAllText($caPath, $caPem, [System.Text.Encoding]::ASCII)
+                Write-LogInfo -Message "Exported intermediate CA certificate" -Context @{
+                    path = $caPath
+                    subject = $intermediateCert.Subject
+                }
+            } else {
+                Write-LogWarn -Message "Intermediate CA certificate not found in LocalMachine\CA store"
+            }
+
+        } finally {
+            $caStore.Close()
+            $caStore.Dispose()
+        }
+
+        Write-LogInfo -Message "Certificate export completed successfully" -Context @{
+            export_path = $ExportPath
+        }
+
+        return $true
+
+    } catch {
+        Write-LogError -Message "Failed to export certificates from Windows Certificate Store" -Context @{
+            error = $_.Exception.Message
+            export_path = $ExportPath
+        }
+        return $false
+    } finally {
+        if ($leafCert) { $leafCert.Dispose() }
+        if ($intermediateCert) { $intermediateCert.Dispose() }
     }
 }
 
@@ -1001,6 +1197,60 @@ function Invoke-CertificateRenewal {
 
             if ($windowsImportResult) {
                 Write-LogInfo -Message "Certificate imported to Windows Certificate Store successfully"
+
+                # STEP 6.6: Export certificates from Windows Certificate Store to PEM (if enabled)
+                if ($Config.windows_certificate_store.ContainsKey('export_to_pem') -and 
+                    $Config.windows_certificate_store.export_to_pem.enabled) {
+                    
+                    Write-LogDebug -Message "Exporting certificates from Windows Certificate Store to PEM files"
+
+                    # Read certificate to get subject
+                    $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($Config.cert_path)
+                    $subject = $cert.Subject
+                    $cert.Dispose()
+
+                    $exportParams = @{
+                        Subject = $subject
+                        DomainName = $Config.domain_name
+                        ExportPath = $Config.windows_certificate_store.export_to_pem.export_path
+                    }
+
+                    if ($Config.windows_certificate_store.export_to_pem.ContainsKey('cert_filename') -and 
+                        -not [string]::IsNullOrWhiteSpace($Config.windows_certificate_store.export_to_pem.cert_filename)) {
+                        $exportParams['CertFilename'] = $Config.windows_certificate_store.export_to_pem.cert_filename
+                    }
+
+                    if ($Config.windows_certificate_store.export_to_pem.ContainsKey('key_filename') -and 
+                        -not [string]::IsNullOrWhiteSpace($Config.windows_certificate_store.export_to_pem.key_filename)) {
+                        $exportParams['KeyFilename'] = $Config.windows_certificate_store.export_to_pem.key_filename
+                    }
+
+                    if ($Config.windows_certificate_store.export_to_pem.ContainsKey('ca_filename_pattern') -and 
+                        -not [string]::IsNullOrWhiteSpace($Config.windows_certificate_store.export_to_pem.ca_filename_pattern)) {
+                        $exportParams['CaFilenamePattern'] = $Config.windows_certificate_store.export_to_pem.ca_filename_pattern
+                    }
+
+                    if ($Config.windows_certificate_store.ContainsKey('store_location') -and 
+                        -not [string]::IsNullOrWhiteSpace($Config.windows_certificate_store.store_location)) {
+                        $exportParams['StoreLocation'] = $Config.windows_certificate_store.store_location
+                    }
+
+                    if ($Config.windows_certificate_store.ContainsKey('store_name') -and 
+                        -not [string]::IsNullOrWhiteSpace($Config.windows_certificate_store.store_name)) {
+                        $exportParams['StoreName'] = $Config.windows_certificate_store.store_name
+                    }
+
+                    $exportResult = Export-CertificateFromWindowsStore @exportParams
+
+                    if ($exportResult) {
+                        Write-LogInfo -Message "Certificates exported from Windows Certificate Store to PEM successfully" -Context @{
+                            export_path = $Config.windows_certificate_store.export_to_pem.export_path
+                        }
+                    } else {
+                        Write-LogWarn -Message "Certificate export from Windows Certificate Store failed"
+                    }
+                }
+
             } else {
                 Write-LogWarn -Message "Windows Certificate Store import failed - certificate files saved but not imported to store"
             }

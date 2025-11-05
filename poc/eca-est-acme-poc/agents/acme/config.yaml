@@ -329,4 +329,24 @@ windows_certificate_store:
   # Environment variable override: <prefix>WINDOWS_CERT_STORE_PFX_PASSWORD
   pfx_password: ""
 
+  # Export certificates from Windows Certificate Store to PEM files
+  export_to_pem:
+    # Enable automatic export of certificates to PEM format
+    enabled: true
+
+    # Base directory for exported PEM files
+    # Environment variable override: <prefix>WINDOWS_CERT_EXPORT_PATH
+    export_path: "C:\\temp\\exported-certs"
+
+    # Export certificate filename (leaf certificate)
+    cert_filename: "server.crt"
+
+    # Export private key filename
+    key_filename: "server.key"
+
+    # Export intermediate CA filename pattern
+    # Use {domain} placeholder to include domain name
+    # Example: "ca-{domain}.crt" becomes "ca-target-server.crt"
+    ca_filename_pattern: "ca-{domain}.crt"
+
 

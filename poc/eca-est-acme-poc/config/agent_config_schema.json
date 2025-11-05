@@ -431,6 +431,44 @@
           "type": "string",
           "default": "",
           "description": "Password for in-memory PFX creation. If empty, a random password is generated. The PFX is created in memory and imported directly to the certificate store without writing to disk."
+        },
+        "export_to_pem": {
+          "type": "object",
+          "description": "Export certificates from Windows Certificate Store to PEM format files. After importing certificates to the Windows Certificate Store, they can be automatically exported back to PEM format for use by non-Windows applications or for backup purposes.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable automatic export of certificates from Windows Certificate Store to PEM files after import."
+            },
+            "export_path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Base directory path where PEM files will be exported. The directory will be created if it doesn't exist.",
+              "examples": [
+                "C:\\temp\\exported-certs",
+                "C:\\ProgramData\\certificates\\exported",
+                "D:\\certificates\\pem"
+              ]
+            },
+            "cert_filename": {
+              "type": "string",
+              "default": "server.crt",
+              "description": "Filename for the exported leaf certificate in PEM format."
+            },
+            "key_filename": {
+              "type": "string",
+              "default": "server.key",
+              "description": "Filename for the exported private key in PEM format (PKCS#8)."
+            },
+            "ca_filename_pattern": {
+              "type": "string",
+              "default": "ca-{domain}.crt",
+              "description": "Filename pattern for the exported intermediate CA certificate. Use {domain} placeholder to include the domain name in the filename."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
         }
       },
       "required": [],
