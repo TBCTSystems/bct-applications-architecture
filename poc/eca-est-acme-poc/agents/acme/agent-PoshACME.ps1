@@ -211,9 +211,47 @@ function Initialize-PoshAcmeEnvironment {
 
         $serverArgs = @{ DirectoryUrl = $directoryUrl }
 
-        # Skip certificate check for development/self-signed certificates
-        if ($Config.environment -eq 'development' -or $Config.ContainsKey('skip_certificate_check') -and $Config.skip_certificate_check) {
-            $serverArgs.Add("SkipCertificateCheck", $true)
+        $envName = if ($Config.ContainsKey('environment') -and $Config.environment) {
+            ($Config.environment.ToString()).Trim().ToLowerInvariant()
+        } else {
+            ''
+        }
+
+        $skipCertificateCheck = $false
+
+        if ($envName -eq 'development') {
+            $skipCertificateCheck = $true
+        }
+        elseif ($Config.ContainsKey('pki_environments') -and $envName -ne '') {
+            $pkiEnvironments = $Config.pki_environments
+            if ($pkiEnvironments -is [System.Collections.IDictionary]) {
+                if ($pkiEnvironments.Contains($envName)) {
+                    $envConfig = $pkiEnvironments[$envName]
+                    if ($envConfig -and $envConfig.PSObject.Properties.Name -contains 'skip_certificate_check' -and $envConfig.skip_certificate_check) {
+                        $skipCertificateCheck = $true
+                    }
+                }
+            }
+            elseif ($pkiEnvironments -is [PSCustomObject]) {
+                $envConfig = $pkiEnvironments.$envName
+                if ($envConfig -and $envConfig.PSObject.Properties.Name -contains 'skip_certificate_check' -and $envConfig.skip_certificate_check) {
+                    $skipCertificateCheck = $true
+                }
+            }
+        }
+
+        if (-not $skipCertificateCheck -and $Config.ContainsKey('skip_certificate_check') -and $Config.skip_certificate_check) {
+            $skipCertificateCheck = $true
+        }
+
+        if ($skipCertificateCheck) {
+            $serverArgs['SkipCertificateCheck'] = $true
+        }
+
+        Write-LogDebug -Message "Set-PAServer arguments" -Context @{
+            directory_url = $directoryUrl
+            skip_certificate_check = $serverArgs.ContainsKey('SkipCertificateCheck')
+            environment = $envName
         }
 
         Set-PAServer @serverArgs
@@ -584,12 +622,12 @@ function Invoke-CertificateRenewal {
 
             if ($keyType -eq 'rsa') {
                 $keySize = if ($Config.ContainsKey('acme_certificate_key_size')) { $Config.acme_certificate_key_size } else { 2048 }
-                $orderParams['KeyLength'] = "rsa$keySize"
+                $orderParams['KeyLength'] = [int]$keySize
                 Write-LogDebug -Message "Using RSA key for certificate" -Context @{ key_size = $keySize }
             }
             elseif ($keyType -eq 'ec') {
                 $keySize = if ($Config.ContainsKey('acme_certificate_key_size')) { $Config.acme_certificate_key_size } else { 256 }
-                $orderParams['KeyLength'] = "ec$keySize"
+                $orderParams['KeyLength'] = "ec-$keySize"
                 Write-LogDebug -Message "Using EC key for certificate" -Context @{ key_size = $keySize }
             }
         }
@@ -688,7 +726,7 @@ function Invoke-CertificateRenewal {
 
         if ($finalOrder.status -eq 'ready') {
             Write-LogInfo -Message "Finalizing order"
-            Submit-OrderFinalize | Out-Null
+            Submit-OrderFinalize -Order $finalOrder | Out-Null
 
             # Poll for finalization completion
             $deadline = (Get-Date).AddSeconds(60)

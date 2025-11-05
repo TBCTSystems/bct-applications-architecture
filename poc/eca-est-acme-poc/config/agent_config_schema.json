@@ -10,6 +10,16 @@
     "key_path"
   ],
   "properties": {
+    "agent_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Logical identifier for the agent instance. Used to derive environment variable prefixes and distinguish multiple agents sharing the same host or container runtime.",
+      "examples": [
+        "acme",
+        "jwk",
+        "est"
+      ]
+    },
     "environment": {
       "type": "string",
       "enum": ["development", "staging", "production"],
@@ -127,6 +137,20 @@
         "/app/certificates/service.key"
       ]
     },
+    "acme_directory_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Relative path to the ACME directory endpoint exposed by step-ca. Combined with pki_url to build the full directory URL passed to Posh-ACME.",
+      "examples": [
+        "/acme/acme/directory",
+        "/acme/local/directory"
+      ]
+    },
+    "challenge_directory": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Filesystem directory where the agent writes ACME HTTP-01 challenge response files. The directory must be served by the target service so the CA can validate ownership (e.g., mapped to /.well-known/acme-challenge)."
+    },
     "domain_name": {
       "type": "string",
       "minLength": 1,
@@ -172,6 +196,46 @@
         3600,
         10
       ]
+    },
+    "acme_certificate_key_type": {
+      "type": "string",
+      "enum": ["rsa", "ec"],
+      "default": "rsa",
+      "description": "Certificate key algorithm requested from the ACME server. Use 'rsa' for RSA key pairs or 'ec' for elliptic curve key pairs."
+    },
+    "acme_certificate_key_size": {
+      "type": "integer",
+      "minimum": 128,
+      "maximum": 4096,
+      "description": "Certificate key size hint passed to the ACME client. For RSA keys this represents the modulus size (2048 or 4096). For EC keys use the curve size (256, 384, or 521)."
+    },
+    "jwk_private_key_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Filesystem path to the JSON Web Key (JWK) that authenticates with the ACME JWK provisioner."
+    },
+    "jwk_key_id": {
+      "type": "string",
+      "description": "Optional identifier associated with the ACME JWK account. When provided, the agent requests this account ID when creating or resuming the account."
+    },
+    "acme_account_contact_email": {
+      "type": ["string", "null"],
+      "description": "Optional contact email address registered with the ACME account. Used by certificate authorities to send expiry notices and operational alerts.",
+      "format": "email",
+      "examples": [
+        "ops@example.com",
+        "security@example.net"
+      ]
+    },
+    "service_reload_container_name": {
+      "type": "string",
+      "description": "Name of the Docker container that should be reloaded after a successful renewal. Defaults to 'eca-target-server'."
+    },
+    "service_reload_timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10,
+      "description": "Timeout in seconds to wait for the reload command to complete." 
     },
     "bootstrap_token": {
       "type": [

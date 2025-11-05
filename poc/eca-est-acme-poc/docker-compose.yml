@@ -50,6 +50,14 @@ volumes:
   posh-acme-state:
     name: posh-acme-state
 
+  # JWK agent state (Posh-ACME accounts specific to JWK provisioner)
+  jwk-posh-acme-state:
+    name: jwk-posh-acme-state
+
+  # JWK private key storage mounted into JWK agent container
+  jwk-secrets:
+    name: jwk-secrets
+
   # EST server persistent data (certificates)
   est-data:
     name: est-data
@@ -335,6 +343,58 @@ services:
     restart: unless-stopped
 
   # ------------------------------------------
+  # JWK Agent (ACME JWK Provisioner Certificates)
+  # ------------------------------------------
+  # PowerShell-based agent that authenticates with the step-ca ACME JWK
+  # provisioner using a pre-provisioned JWK and renews the NGINX server
+  # certificate on the shared server-certs volume.
+  eca-jwk-agent:
+    build:
+      context: .
+      dockerfile: agents/jwk/Dockerfile
+    container_name: eca-jwk-agent
+    networks:
+      - eca-poc-network
+    volumes:
+      - server-certs:/certs/server
+      - challenge:/challenge
+      - jwk-secrets:/config/jwk
+      - jwk-posh-acme-state:/posh-acme-state
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      AGENT_NAME: ${JWK_AGENT_NAME:-jwk}
+      AGENT_ENV_PREFIX: ${JWK_AGENT_PREFIX:-JWK_}
+      PKI_URL: ${PKI_URL:-https://pki:9000}
+      ACME_DIRECTORY_PATH: ${ACME_DIRECTORY_PATH:-/acme/acme/directory}
+      JWK_DOMAIN_NAME: ${JWK_DOMAIN_NAME:-target-server}
+      JWK_CERT_PATH: /certs/server/cert.pem
+      JWK_KEY_PATH: /certs/server/key.pem
+      JWK_PRIVATE_KEY_PATH: /config/jwk/device.jwk
+      JWK_CHALLENGE_DIRECTORY: ${JWK_CHALLENGE_DIRECTORY:-/challenge}
+      JWK_SERVICE_RELOAD_CONTAINER_NAME: ${JWK_SERVICE_RELOAD_CONTAINER_NAME:-eca-target-server}
+      JWK_SERVICE_RELOAD_TIMEOUT_SECONDS: ${JWK_SERVICE_RELOAD_TIMEOUT_SECONDS:-15}
+      JWK_RENEWAL_THRESHOLD_PCT: ${JWK_RENEWAL_THRESHOLD_PCT:-75}
+      JWK_CHECK_INTERVAL_SEC: ${JWK_CHECK_INTERVAL_SEC:-60}
+      JWK_ACME_CERTIFICATE_KEY_TYPE: ${JWK_ACME_CERTIFICATE_KEY_TYPE:-ec}
+      JWK_ACME_CERTIFICATE_KEY_SIZE: ${JWK_ACME_CERTIFICATE_KEY_SIZE:-256}
+      LOG_FORMAT: json
+      POSHACME_HOME: /posh-acme-state
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "172.17.0.1:24224"
+        tag: "docker.{{.Name}}"
+        fluentd-async: "true"
+        fluentd-retry-wait: "1s"
+        fluentd-max-retries: "3"
+    depends_on:
+      pki:
+        condition: service_healthy
+      fluentd:
+        condition: service_started
+    restart: unless-stopped
+
+  # ------------------------------------------
   # EST Agent (Client Certificate Management)
   # ------------------------------------------
   # PowerShell-based autonomous agent for EST protocol
@@ -403,8 +463,8 @@ services:
     networks:
       - eca-poc-network
     ports:
-      - "443:443"
-      - "80:80"  # HTTP for ACME HTTP-01 challenge validation
+      - "${TARGET_SERVER_HTTPS_PORT:-443}:443"
+      - "${TARGET_SERVER_HTTP_PORT:-80}:80"  # HTTP for ACME HTTP-01 challenge validation
     volumes:
       # Server certificates from ACME agent (read-write to allow bootstrap cert creation)
       - server-certs:/certs/server

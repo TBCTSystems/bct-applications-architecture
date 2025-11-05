@@ -36,6 +36,7 @@ param(
 
 $script:PkiVolumeName = 'pki-data'
 $script:OpenXpkiConfigVolumeName = 'openxpki-config-data'
+$script:JwkSecretsVolumeName = 'jwk-secrets'
 $script:TempPkiDir = Join-Path ([System.IO.Path]::GetTempPath()) 'eca-pki-init'
 $script:CaName = 'ECA-PoC-CA'
 $script:CaDns = 'pki,localhost'
@@ -45,6 +46,8 @@ $script:DefaultCaPassword = 'eca-poc-default-password'
 $script:OpenXpkiRealm = 'democa'
 $script:OpenXpkiCaName = 'est-ca'
 $script:ProjectRoot = Split-Path -Parent $PSCommandPath
+$script:JwkDeviceFileName = 'device.jwk'
+$script:JwkPublicFileName = 'device-public.jwk'
 
 # ---------------------------------------------------------------------------
 # Logging helpers
@@ -346,6 +349,62 @@ function Wait-ForEstCertificates {
     throw "EST certificates were not generated within the expected time."
 }
 
+function Ensure-JwkVolume {
+    Write-Info "Ensuring Docker volume '$($script:JwkSecretsVolumeName)' exists..."
+
+    $volumeExists = (& docker volume inspect $script:JwkSecretsVolumeName 2>$null) -ne $null
+    if (-not $volumeExists) {
+        & docker volume create $script:JwkSecretsVolumeName | Out-Null
+        Write-Success "Docker volume '$($script:JwkSecretsVolumeName)' created."
+    }
+    else {
+        Write-Info "JWK secrets volume already present."
+    }
+}
+
+function Test-JwkMaterialExists {
+    & docker run --rm `
+        -v "$($script:JwkSecretsVolumeName):/secrets" `
+        alpine `
+        sh -c "test -f /secrets/$($script:JwkDeviceFileName)" | Out-Null
+
+    return $LASTEXITCODE -eq 0
+}
+
+function Ensure-JwkMaterial {
+    Ensure-JwkVolume
+
+    if (Test-JwkMaterialExists) {
+        Write-Info "Existing JWK private key detected – skipping generation."
+        return
+    }
+
+    Write-Info "Generating JWK private key material for the JWK agent..."
+
+    $jwkDir = Join-Path $script:TempPkiDir 'jwk'
+    if (Test-Path $jwkDir) {
+        Remove-Item -Path $jwkDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $jwkDir | Out-Null
+
+    $publicPath = Join-Path $jwkDir $script:JwkPublicFileName
+    $privatePath = Join-Path $jwkDir $script:JwkDeviceFileName
+
+    & step @('crypto', 'jwk', 'create', $publicPath, $privatePath,
+        '--kty', 'EC', '--crv', 'P-256', '--force', '--no-password', '--insecure') | Out-Null
+
+    $copyScript = "cp /source/$($script:JwkDeviceFileName) /secrets/$($script:JwkDeviceFileName) && cp /source/$($script:JwkPublicFileName) /secrets/$($script:JwkPublicFileName) && chmod 600 /secrets/$($script:JwkDeviceFileName) && chmod 640 /secrets/$($script:JwkPublicFileName)"
+
+    & docker run --rm `
+        -u 'root' `
+        -v "$($script:JwkSecretsVolumeName):/secrets" `
+        -v "${jwkDir}:/source:ro" `
+        alpine `
+        sh -c $copyScript | Out-Null
+
+    Write-Success "JWK material copied to Docker volume '$($script:JwkSecretsVolumeName)'."
+}
+
 # ---------------------------------------------------------------------------
 # OpenXPKI initialization
 # ---------------------------------------------------------------------------
@@ -369,7 +428,7 @@ function Copy-OpenXpkiBaseConfig {
 
     & docker run --rm `
         -v "$($script:OpenXpkiConfigVolumeName):/config" `
-        -v "$sourcePath:/source:ro" `
+    -v "${sourcePath}:/source:ro" `
         alpine `
         sh -c "cp -r /source/* /config/" | Out-Null
 
@@ -592,6 +651,7 @@ function Invoke-Main {
     Copy-PkiToVolume
     Start-PkiForProvisioning
     Wait-ForEstCertificates
+    Ensure-JwkMaterial
 
     Ensure-OpenXpkiVolume
     Copy-OpenXpkiBaseConfig

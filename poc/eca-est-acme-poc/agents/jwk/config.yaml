@@ -1,0 +1,68 @@
+# JWK Certificate Renewal Agent Configuration
+# ===========================================
+# This file configures the ECA-JWK agent which requests and renews certificates
+# from the step-ca ACME JWK provisioner using a pre-provisioned JWK account key.
+
+agent_name: "jwk"
+
+environment: "development"
+
+pki_environments:
+  development:
+    url: "https://pki:9000"
+    skip_certificate_check: true
+    timeout_seconds: 30
+  staging:
+    url: "https://pki-staging.example.com:9000"
+    skip_certificate_check: false
+    timeout_seconds: 60
+  production:
+    url: "https://pki.example.com:9000"
+    skip_certificate_check: false
+    timeout_seconds: 120
+
+pki_url: "https://pki:9000"
+
+acme_directory_path: "/acme/acme/directory"
+
+domain_name: "target-server"
+
+cert_path: "/certs/server/cert.pem"
+key_path: "/certs/server/key.pem"
+
+# Directory shared with the target server for ACME HTTP-01 challenges.
+challenge_directory: "/challenge"
+
+# Existing JWK (JSON Web Key) used to authenticate with the ACME JWK provisioner.
+jwk_private_key_path: "/config/jwk/device.jwk"
+
+# Optional unique identifier for the provisioner-managed account.
+jwk_key_id: ""
+
+# Optional ACME account contact email address.
+acme_account_contact_email: ""
+
+# Renewal policy controls.
+renewal_threshold_pct: 1
+check_interval_sec: 60
+
+acme_certificate_key_type: "ec"
+acme_certificate_key_size: 256
+
+service_reload_container_name: "eca-target-server"
+service_reload_timeout_seconds: 15
+
+certificate_chain:
+  enabled: true
+  installation:
+    install_full_chain_to_cert_path: true
+    create_separate_chain_files: true
+  full_chain_path: "/certs/server-fullchain.crt"
+  intermediates_path: "/certs/server-chain.crt"
+
+crl:
+  enabled: false
+  url: ""
+  cache_path: "/cache/crl/ca.crl"
+  max_age_hours: 24
+  check_before_renewal: true

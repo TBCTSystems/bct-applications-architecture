@@ -34,6 +34,7 @@ set -euo pipefail
 
 readonly VOLUME_PKI="pki-data"
 readonly VOLUME_OPENXPKI_CONFIG="openxpki-config-data"
+readonly VOLUME_JWK_SECRETS="jwk-secrets"
 readonly TEMP_PKI_DIR="/tmp/eca-pki-init"
 readonly CA_NAME="ECA-PoC-CA"
 readonly CA_DNS="pki,localhost"
@@ -42,6 +43,8 @@ readonly CA_PROVISIONER="admin"
 readonly DEFAULT_CA_PASSWORD="eca-poc-default-password"
 readonly OPENXPKI_REALM="democa"
 readonly OPENXPKI_CA_NAME="est-ca"
+readonly JWK_DEVICE_FILENAME="device.jwk"
+readonly JWK_PUBLIC_FILENAME="device-public.jwk"
 
 ################################################################################
 # Color Output
@@ -259,6 +262,59 @@ wait_for_est_certificates() {
 
     log_error "EST certificates were not generated"
     return 1
+}
+
+ensure_jwk_volume() {
+    log_info "Ensuring JWK secrets volume exists (${VOLUME_JWK_SECRETS})..."
+
+    if docker volume inspect "${VOLUME_JWK_SECRETS}" >/dev/null 2>&1; then
+        log_info "JWK secrets volume already present"
+        return 0
+    fi
+
+    docker volume create "${VOLUME_JWK_SECRETS}" >/dev/null
+    log_success "Created Docker volume '${VOLUME_JWK_SECRETS}'"
+}
+
+jwk_key_exists() {
+    docker run --rm \
+        -v "${VOLUME_JWK_SECRETS}:/secrets" \
+        alpine \
+        sh -c "test -f /secrets/${JWK_DEVICE_FILENAME}" >/dev/null 2>&1
+}
+
+provision_jwk_private_key() {
+    ensure_jwk_volume
+
+    if jwk_key_exists; then
+        log_info "Existing JWK private key detected - skipping generation"
+        return 0
+    fi
+
+    log_info "Generating JWK private key material for the JWK agent..."
+
+    local jwk_temp_dir="${TEMP_PKI_DIR}/jwk"
+    rm -rf "${jwk_temp_dir}"
+    mkdir -p "${jwk_temp_dir}"
+
+    local public_path="${jwk_temp_dir}/${JWK_PUBLIC_FILENAME}"
+    local private_path="${jwk_temp_dir}/${JWK_DEVICE_FILENAME}"
+
+    step crypto jwk create "${public_path}" "${private_path}" \
+        --kty EC \
+        --crv P-256 \
+        --force \
+        --no-password \
+        --insecure
+
+    docker run --rm \
+        -u root \
+        -v "${VOLUME_JWK_SECRETS}:/secrets" \
+        -v "${jwk_temp_dir}:/source:ro" \
+        alpine \
+        sh -c "cp /source/${JWK_DEVICE_FILENAME} /secrets/${JWK_DEVICE_FILENAME} && cp /source/${JWK_PUBLIC_FILENAME} /secrets/${JWK_PUBLIC_FILENAME} && chmod 600 /secrets/${JWK_DEVICE_FILENAME} && chmod 640 /secrets/${JWK_PUBLIC_FILENAME}"
+
+    log_success "Provisioned JWK material in '${VOLUME_JWK_SECRETS}'"
 }
 
 ################################################################################
@@ -534,6 +590,7 @@ main() {
     # Start PKI to trigger provisioner configuration and EST cert generation
     start_pki_for_provisioning
     wait_for_est_certificates
+    provision_jwk_private_key
 
     # Now initialize OpenXPKI with the EST certificates
     initialize_openxpki

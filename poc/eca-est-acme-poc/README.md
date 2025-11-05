@@ -179,6 +179,17 @@ Integration runs expect `pki`, `openxpki-db`, `openxpki-server`, `openxpki-clien
   ```
   The agent now reads the namespaced variables without colliding with other services.
 - All documented overrides follow the `<prefix><UPPER_SNAKE_CASE>` pattern (e.g., `ACME_CERT_PATH`, `EST_DEVICE_NAME`, `mosquitto_eca_jwk_EST_BOOTSTRAP_TOKEN`).
+- Example (JWK agent):
+  ```bash
+  export AGENT_ENV_PREFIX=EDGE_JWK_
+  export EDGE_JWK_PKI_URL="https://pki.demo.lan:9000"
+  export EDGE_JWK_DOMAIN_NAME="demo-edge"
+  export EDGE_JWK_CERT_PATH="/certs/demo-edge/cert.pem"
+  export EDGE_JWK_KEY_PATH="/certs/demo-edge/key.pem"
+  export EDGE_JWK_JWK_PRIVATE_KEY_PATH="/secrets/jwk/device.jwk"
+  export EDGE_JWK_SERVICE_RELOAD_CONTAINER_NAME="edge-nginx"
+  ```
+  Use this when multiple JWK-backed renewal agents share the same host or when customizing deployment-specific certificates and reload behaviour.
 - Need to onboard a new agent? Follow the checklist in [docs/ECA_DEVELOPER_GUIDE.md](docs/ECA_DEVELOPER_GUIDE.md#4-extending-the-platform-adding-a-new-agent) to define config keys, prefixes, Docker services, and tests without breaking existing deployments.
 
 ## Operations & Monitoring
@@ -188,13 +199,15 @@ All containers emit structured logs to stdout/stderr. Inspect them with standard
 ```bash
 docker compose logs -f eca-acme-agent
 docker compose logs -f eca-est-agent
+docker compose logs -f eca-jwk-agent
 ```
 
 To verify artifacts, mount the published volumes locally:
 
 ```bash
-docker run --rm -v server-certs:/data alpine ls -l /data
-docker run --rm -v client-certs:/data alpine ls -l /data
+docker run --rm -v server-certs:/data alpine ls -l /data       # ACME/JWK output
+docker run --rm -v client-certs:/data alpine ls -l /data       # EST output
+docker run --rm -v jwk-secrets:/data alpine ls -l /data        # Provisioned JWK material
 ```
 
 Dedicated observability is available through Fluentd → Loki → Grafana:

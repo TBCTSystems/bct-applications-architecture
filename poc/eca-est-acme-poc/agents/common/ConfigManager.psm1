@@ -162,7 +162,9 @@ function Merge-ConfigWithEnvironment {
         'acme_certificate_key_type'        = 'ACME_CERTIFICATE_KEY_TYPE'
         'acme_certificate_key_size'        = 'ACME_CERTIFICATE_KEY_SIZE'
         'service_reload_container_name'    = 'SERVICE_RELOAD_CONTAINER_NAME'
-        'service_reload_timeout_seconds'   = 'SERVICE_RELOAD_TIMEOUT_SECONDS'
+    'service_reload_timeout_seconds'   = 'SERVICE_RELOAD_TIMEOUT_SECONDS'
+    'jwk_private_key_path'             = 'JWK_PRIVATE_KEY_PATH'
+    'jwk_key_id'                       = 'JWK_KEY_ID'
     }
 
     foreach ($configKey in $envMappings.Keys) {
@@ -279,6 +281,7 @@ function Apply-ConfigDefaults {
             value = 60
         }
     }
+
 }
 
 <#
