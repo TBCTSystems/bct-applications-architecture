@@ -1,0 +1,37 @@
+```mermaid
+flowchart TB
+    subgraph Host [Docker Host\nLinux/macOS/Windows]
+        subgraph Network [Bridge Network: eca-poc-network]
+            PKI[pki\nsmallstep/step-ca:0.25]
+            ACME[eca-acme-agent\nPowerShell 7.4]
+            EST[eca-est-agent\nPowerShell 7.4]
+            NGINX[target-server\nnginx:1.25]
+            CLIENT[target-client\nalpine:latest]
+        end
+
+        subgraph Volumes [Docker Volumes]
+            VolServer[(server-certs\n/certs/server)]
+            VolClient[(client-certs\n/certs/client)]
+            VolPKI[(pki-data\n/home/step)]
+        end
+
+        ACME --- VolServer
+        EST --- VolClient
+        NGINX --- VolServer
+        CLIENT --- VolClient
+        PKI --- VolPKI
+
+        ACME -- ACME HTTPS 9000 --> PKI
+        EST -- EST HTTPS 9000 --> PKI
+        PKI -- http-01 challenge --> NGINX
+        CLIENT -- mTLS 443 --> NGINX
+    end
+
+    NGINX -. exposes 443 .- Host
+    PKI -. exposes 9000 .- Host
+
+    Operator([Operator/Developer\nBrowser + Docker CLI])
+    Operator -- HTTPS 443 --> NGINX
+    Operator -- HTTPS 9000 --> PKI
+    Operator -- docker compose --> Host
+```

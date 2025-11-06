@@ -1,0 +1,320 @@
+# ACME Agent Configuration File
+# =============================
+# This configuration file provides default values for the ECA-ACME agent.
+# All values can be overridden by environment variables (see comments below).
+# The agent validates this configuration against the JSON schema at:
+# config/agent_config_schema.json
+
+# Agent Identity
+# --------------
+# Unique identifier for this agent instance, used to derive environment variable prefix.
+# For multi-instance deployments (multiple ACME agents on same host), each agent must
+# have a unique agent_name to avoid configuration collisions.
+#
+# The agent_name is automatically converted to uppercase and used as the prefix for
+# environment variable overrides. For example:
+#   agent_name: "acme-app1" → Environment variables: ACME_APP1_PKI_URL, ACME_APP1_CERT_PATH, etc.
+#   agent_name: "acme-app2" → Environment variables: ACME_APP2_PKI_URL, ACME_APP2_CERT_PATH, etc.
+#
+# This enables scenarios like:
+#   - Multiple applications on same host, each with dedicated ACME agent
+#   - Different ACME servers for different applications
+#   - Per-application certificate policies and renewal schedules
+#
+# Leave empty to use unprefixed environment variables (legacy mode, not recommended for multi-instance).
+# Environment variable override: AGENT_NAME (but typically set in config file for instance identity)
+# NOTE: agent_name field removed - not defined in schema. Use env_var_prefix instead.
+# agent_name: "acme"
+
+# PKI Server Configuration
+# ---------------------
+# ACME Certificate Authority configuration with multi-environment support.
+# The agent automatically detects environment based on ACME_ENVIRONMENT variable.
+#
+# Supported environments:
+#   - development (dev): Local testing with relaxed validation
+#   - staging: Pre-production testing with production-like constraints
+#   - production (prod): Live environment with strict validation
+#
+# Environment variable override: <prefix>ACME_ENVIRONMENT (e.g., ACME_ENVIRONMENT)
+# Default: development
+environment: "development"
+
+# PKI Server URLs by Environment
+# -----------------------------
+# Base URLs for step-ca ACME server API endpoints by environment.
+# These can be overridden per-environment using environment variables:
+#   - <prefix>PKI_URL_DEV (e.g., ACME_PKI_URL_DEV)
+#   - <prefix>PKI_URL_STAGING (e.g., ACME_PKI_URL_STAGING)
+#   - <prefix>PKI_URL_PROD (e.g., ACME_PKI_URL_PROD)
+#
+# If no environment-specific override is set, falls back to PKI_URL.
+pki_environments:
+  development:
+    url: "https://pki:9000"
+    skip_certificate_check: true
+    timeout_seconds: 30
+  staging:
+    url: "https://pki-staging.example.com:9000"
+    skip_certificate_check: false
+    timeout_seconds: 60
+  production:
+    url: "https://pki.example.com:9000"
+    skip_certificate_check: false
+    timeout_seconds: 120
+
+# Fallback PKI URL (used if no environment-specific URL set)
+# Environment variable override: <prefix>PKI_URL (e.g., ACME_PKI_URL)
+pki_url: "https://pki:9000"
+
+# Certificate Output Path
+# ------------------------
+# Absolute filesystem path where the agent will write the issued certificate.
+# Format: PEM-encoded X.509 certificate with full chain.
+# The agent will set file permissions to 0644 (world-readable).
+# Parent directory must exist and be writable by the agent.
+# In Docker deployments, this typically points to a shared volume.
+# Environment variable override: <prefix>CERT_PATH (e.g., ACME_CERT_PATH)
+cert_path: "/certs/server/server.crt"
+
+# Private Key Output Path
+# ------------------------
+# Absolute filesystem path where the agent will write the private key.
+# Format: PEM-encoded PKCS#8 format (RSA-2048 or ECDSA P-256).
+# The agent will automatically set file permissions to 0600 (owner read/write only).
+# SECURITY WARNING: Never transmit this file over the network or expose it.
+# Parent directory must exist and be writable by the agent.
+# Environment variable override: <prefix>KEY_PATH (e.g., ACME_KEY_PATH)
+key_path: "/certs/server/server.key"
+
+# Domain Name
+# -----------
+# The domain name or hostname to request in the certificate.
+# This value will be used as both the Subject Common Name (CN) and
+# Subject Alternative Name (SAN) in the certificate request.
+# The ACME CA will validate this domain via HTTP-01 challenge, so the
+# agent must be reachable at http://{domain_name}/.well-known/acme-challenge/
+# Environment variable override: <prefix>DOMAIN_NAME (e.g., ACME_DOMAIN_NAME)
+domain_name: "target-server"
+
+# Renewal Threshold Percentage
+# -----------------------------
+# Trigger certificate renewal when this percentage of the certificate's
+# lifetime has elapsed. This provides a safety margin before expiration.
+# Value range: 1-100
+# Default: 75 (renew at 75% lifetime = 25% remaining)
+#
+# Examples:
+#   - For a 10-minute certificate: 75% triggers renewal after 7.5 minutes
+#   - For a 90-day certificate: 75% triggers renewal after 67.5 days
+#
+# Recommended values:
+#   - Short-lived certs (minutes/hours): 70-80 (narrower margin acceptable)
+#   - Long-lived certs (days/months): 75-85 (more safety margin)
+#
+# Environment variable override: <prefix>RENEWAL_THRESHOLD_PCT
+renewal_threshold_pct: 75
+
+# Check Interval (seconds)
+# -------------------------
+# Time to sleep between certificate expiration status checks.
+# Lower values = faster detection of approaching expiration, higher resource usage.
+# Higher values = reduced CPU/log usage, slower detection.
+# Default: 60 seconds
+#
+# Recommended values based on certificate lifetime:
+#   - Certificates lasting minutes: 10-30 seconds
+#   - Certificates lasting hours: 60-300 seconds
+#   - Certificates lasting days: 300-3600 seconds
+#
+# Environment variable override: <prefix>CHECK_INTERVAL_SEC
+check_interval_sec: 60
+
+# ACME Challenge Directory
+# -------------------------
+# Base directory where HTTP-01 challenge tokens are placed for CA validation.
+# The ACME CA will attempt to fetch challenge tokens from:
+#   http://{domain_name}/.well-known/acme-challenge/{token}
+#
+# This directory must be:
+#   - Writable by the agent
+#   - Served by the target web server (typically NGINX)
+#   - Mounted as a shared volume in Docker deployments
+#
+# The agent will automatically create the .well-known/acme-challenge subdirectory
+# structure if it doesn't exist.
+#
+# Default: /challenge
+# Environment variable override: <prefix>CHALLENGE_DIRECTORY (e.g., ACME_CHALLENGE_DIRECTORY)
+# NOTE: challenge_directory field removed - not defined in schema
+# challenge_directory: "/challenge"
+
+# =============================================================================
+# ACME Protocol Configuration
+# =============================================================================
+
+# ACME Account Contact Email
+# ---------------------------
+# Optional contact email address for the ACME account (RFC 8555 compliance).
+# The CA may use this email to send notifications about certificate expiration,
+# revocation, or other account-related events.
+#
+# Format: Valid email address (e.g., "admin@example.com")
+# Leave empty to create account without contact information.
+#
+# Environment variable override: <prefix>ACME_ACCOUNT_CONTACT_EMAIL (e.g., ACME_ACME_ACCOUNT_CONTACT_EMAIL)
+# NOTE: acme_account_contact_email field removed - not defined in schema
+# acme_account_contact_email: ""
+
+# ACME Directory Path
+# -------------------
+# Path component of the ACME directory URL relative to the PKI base URL.
+# For step-ca, this is typically "/acme/acme/directory" where the first "acme"
+# is the provisioner name and the second "acme" is the ACME protocol endpoint.
+#
+# Full directory URL: {pki_url}{acme_directory_path}
+# Example: https://pki:9000/acme/acme/directory
+#
+# Default: /acme/acme/directory (step-ca default)
+# Environment variable override: <prefix>ACME_DIRECTORY_PATH (e.g., ACME_ACME_DIRECTORY_PATH)
+# NOTE: acme_directory_path field removed - not defined in schema
+# acme_directory_path: "/acme/acme/directory"
+
+# Certificate Key Type
+# ---------------------
+# Cryptographic algorithm for certificate private key generation.
+#
+# Supported values:
+#   - "rsa": RSA key (size controlled by acme_certificate_key_size)
+#   - "ec": Elliptic Curve key (P-256 or P-384 based on key_size)
+#
+# Recommendations:
+#   - RSA-2048: Widely compatible, moderate performance
+#   - RSA-4096: Maximum compatibility, slower performance
+#   - EC P-256: Modern, fast, smaller keys (recommended for new deployments)
+#   - EC P-384: Enhanced security margin
+#
+# Default: rsa
+# Environment variable override: <prefix>ACME_CERTIFICATE_KEY_TYPE (e.g., ACME_ACME_CERTIFICATE_KEY_TYPE)
+# NOTE: acme_certificate_key_type field removed - not defined in schema
+# acme_certificate_key_type: "rsa"
+
+# Certificate Key Size
+# --------------------
+# Key size in bits for certificate private key generation.
+#
+# For RSA keys:
+#   - 2048: Standard, widely supported (recommended minimum)
+#   - 4096: Enhanced security, slower operations
+#
+# For EC keys:
+#   - 256: P-256 curve (secp256r1 / prime256v1)
+#   - 384: P-384 curve (secp384r1)
+#
+# Default: 2048
+# Environment variable override: <prefix>ACME_CERTIFICATE_KEY_SIZE (e.g., ACME_ACME_CERTIFICATE_KEY_SIZE)
+# NOTE: acme_certificate_key_size field removed - not defined in schema
+# acme_certificate_key_size: 2048
+
+# Service Reload Configuration
+# -----------------------------
+# Configuration for reloading the target service (e.g., NGINX) after certificate renewal.
+
+# Service container name (for Docker deployments)
+# The Docker container name to send reload signals to.
+# Environment variable override: <prefix>SERVICE_RELOAD_CONTAINER_NAME (e.g., ACME_SERVICE_RELOAD_CONTAINER_NAME)
+# NOTE: service_reload_container_name field removed - not defined in schema
+# service_reload_container_name: "eca-target-server"
+
+# Service reload timeout (seconds)
+# Maximum time to wait for service reload operation to complete.
+# Environment variable override: <prefix>SERVICE_RELOAD_TIMEOUT_SECONDS (e.g., ACME_SERVICE_RELOAD_TIMEOUT_SECONDS)
+# NOTE: service_reload_timeout_seconds field removed - not defined in schema
+# service_reload_timeout_seconds: 10
+
+# Posh-ACME State Directory
+# -------------------------
+# Posh-ACME stores account and order state in the directory pointed to the
+# POSHACME_HOME environment variable. When running via docker compose this
+# is set automatically to `/posh-acme-state`, which is backed by a persistent
+# volume. The agent falls back to `/config/poshacme` if the environment
+# variable is not provided.
+
+# Notes on Additional Configuration
+# ----------------------------------
+# The following values are HARDCODED in the agent modules and cannot be
+# configured via this file or environment variables:
+#
+# - ACME Provisioner Name: "acme" (hardcoded for step-ca)
+#   This is the step-ca provisioner name used for ACME protocol.
+#
+# - Target Service Name: "target-server" (hardcoded in ServiceReloadController.psm1)
+#   This is the Docker container name for the NGINX service to reload.
+#
+# These values match the Docker Compose deployment architecture and should
+# not need modification for standard deployments. If you need to change them,
+# you must modify the corresponding PowerShell module source code.
+
+# =============================================================================
+# CRL (Certificate Revocation List) Configuration
+# =============================================================================
+# CRL validation settings for certificate revocation checking
+crl:
+  # Enable CRL validation checks
+  enabled: true
+
+  # URL to download CRL from (step-ca CRL endpoint)
+  url: "http://pki:9001/crl/ca.crl"
+
+  # Local cache path for downloaded CRL
+  cache_path: "/tmp/ca.crl"
+
+  # Maximum age of cached CRL before re-download (hours)
+  max_age_hours: 2.0
+
+  # Check certificates against CRL before renewal
+  check_before_renewal: true
+
+# =============================================================================
+# Certificate Chain Management Configuration
+# =============================================================================
+# Certificate chain handling and validation settings
+certificate_chain:
+  # Enable full certificate chain handling (leaf + intermediates + root)
+  enabled: true
+
+  # Certificate chain output path (full chain including intermediates)
+  # Environment variable override: <prefix>CERT_CHAIN_PATH (e.g., ACME_CERT_CHAIN_PATH)
+  full_chain_path: "/certs/server/server-fullchain.crt"
+
+  # Intermediate certificates output path
+  # Environment variable override: <prefix>INTERMEDIATES_PATH (e.g., ACME_INTERMEDIATES_PATH)
+  intermediates_path: "/certs/server/server-intermediates.crt"
+
+  # Chain validation options
+  validation:
+    # Validate certificate chain completeness before installation
+    validate_completeness: true
+
+    # Verify chain signatures are valid
+    verify_signatures: true
+
+    # Check for expired certificates in the chain
+    check_expiry: true
+
+    # Maximum chain depth allowed (prevents certificate chain loops)
+    max_depth: 5
+
+  # Chain installation preferences
+  installation:
+    # Install full chain to cert_path (recommended for NGINX)
+    install_full_chain_to_cert_path: true
+
+    # Install leaf-only certificate (for legacy applications)
+    install_leaf_only: false
+
+    # Create separate chain files for debugging
+    create_separate_chain_files: true
+
+    # Set file permissions for chain files
+    chain_file_permissions: "0644"

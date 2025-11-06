@@ -1,0 +1,47 @@
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as Agent Loop
+    participant Monitor as Certificate Monitor
+    participant Engine as Renewal Engine
+    participant ACME as ACME Client
+    participant Crypto as Crypto Helper
+    participant PKI as step-ca PKI
+    participant Volume as Shared Volume (/certs/server)
+    participant Installer as Certificate Installer
+    participant Reload as Reload Controller
+    participant Nginx as Target Server (NGINX)
+
+    Agent->>Monitor: Check certificate status
+    Monitor->>Volume: Read server.crt
+    Volume-->>Monitor: Certificate PEM
+    Monitor->>Crypto: Parse certificate
+    Crypto-->>Monitor: Expiry & metadata
+    Monitor-->>Agent: Lifetime = 80%
+    Agent->>Engine: Evaluate renewal threshold
+    Engine-->>Agent: Renew (80% > 75%)
+
+    Agent->>ACME: Start renewal
+    ACME->>Crypto: Generate key pair
+    ACME->>Crypto: Build CSR
+    ACME->>PKI: newOrder(domain)
+    PKI-->>ACME: Pending order + http-01 challenge
+    ACME->>Volume: Publish challenge token
+    ACME->>PKI: Notify challenge ready
+    PKI->>Nginx: Validate challenge
+    Nginx->>Volume: Fetch token
+    Volume-->>Nginx: Token contents
+    Nginx-->>PKI: Challenge success
+
+    ACME->>PKI: Finalize order with CSR
+    PKI-->>ACME: Certificate chain
+    ACME-->>Agent: Return cert + key
+
+    Agent->>Installer: Install cert/key
+    Installer->>Volume: Atomic write server.key
+    Installer->>Volume: Atomic write server.crt
+    Installer-->>Agent: Installation complete
+    Agent->>Reload: nginx -s reload
+    Reload->>Nginx: Reload TLS config
+    Agent-->>Agent: Log success & sleep
+```

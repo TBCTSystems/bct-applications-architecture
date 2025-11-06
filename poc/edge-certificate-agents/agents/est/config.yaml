@@ -1,0 +1,151 @@
+# EST Agent Configuration File
+# =============================
+# This configuration file provides default values for the ECA-EST agent.
+# All values can be overridden by environment variables (see comments below).
+# The agent validates this configuration against the JSON schema at:
+# config/agent_config_schema.json
+
+# EST Server Base URL
+# --------------------
+# Base URL for the EST server API endpoint.
+# This is where the agent will connect to request client certificates via EST protocol (RFC 7030).
+# Must include protocol (https) and port if non-standard.
+# Note: In Docker Compose deployments, this is overridden via PKI_URL environment variable
+# to point to the openxpki-web service at https://openxpki-web:443 (internal container port).
+# Environment variable override: <prefix>PKI_URL (e.g., EST_PKI_URL)
+pki_url: "https://openxpki-web:443"
+
+# Certificate Output Path
+# ------------------------
+# Absolute filesystem path where the agent will write the issued client certificate.
+# Format: PEM-encoded X.509 certificate with full chain.
+# The agent will set file permissions to 0644 (world-readable).
+# Parent directory must exist and be writable by the agent.
+# In Docker deployments, this typically points to a shared volume.
+# Environment variable override: <prefix>CERT_PATH (e.g., EST_CERT_PATH)
+cert_path: "/certs/client/client.crt"
+
+# Private Key Output Path
+# ------------------------
+# Absolute filesystem path where the agent will write the private key.
+# Format: PEM-encoded PKCS#8 format (RSA-2048 or ECDSA P-256).
+# The agent will automatically set file permissions to 0600 (owner read/write only).
+# SECURITY WARNING: Never transmit this file over the network or expose it.
+# Parent directory must exist and be writable by the agent.
+# Environment variable override: <prefix>KEY_PATH (e.g., EST_KEY_PATH)
+key_path: "/certs/client/client.key"
+
+# Device Name/Identifier
+# -----------------------
+# Unique identifier for this device/client used in the certificate Subject Common Name (CN).
+# This value will be used as the Subject Common Name in the certificate request.
+# For EST agents, this represents the device identity (not a domain name).
+# Unlike ACME agents which use domain_name for HTTP-01 validation, EST agents
+# use device_name to identify the client device during token-based enrollment.
+# Environment variable override: <prefix>DEVICE_NAME (e.g., EST_DEVICE_NAME)
+device_name: "client-device-001"
+
+# Renewal Threshold Percentage
+# -----------------------------
+# Trigger certificate renewal when this percentage of the certificate's
+# lifetime has elapsed. This provides a safety margin before expiration.
+# Value range: 1-100
+# Default: 75 (renew at 75% lifetime = 25% remaining)
+#
+# Examples:
+#   - For a 10-minute certificate: 75% triggers renewal after 7.5 minutes
+#   - For a 90-day certificate: 75% triggers renewal after 67.5 days
+#
+# Recommended values:
+#   - Short-lived certs (minutes/hours): 70-80 (narrower margin acceptable)
+#   - Long-lived certs (days/months): 75-85 (more safety margin)
+#
+# Environment variable override: <prefix>RENEWAL_THRESHOLD_PCT
+renewal_threshold_pct: 75
+
+# Check Interval (seconds)
+# -------------------------
+# Time to sleep between certificate expiration status checks.
+# Lower values = faster detection of approaching expiration, higher resource usage.
+# Higher values = reduced CPU/log usage, slower detection.
+# Default: 60 seconds
+#
+# Recommended values based on certificate lifetime:
+#   - Certificates lasting minutes: 10-30 seconds
+#   - Certificates lasting hours: 60-300 seconds
+#   - Certificates lasting days: 300-3600 seconds
+#
+# Environment variable override: <prefix>CHECK_INTERVAL_SEC
+check_interval_sec: 60
+
+# Bootstrap Token
+# ---------------
+# **CRITICAL SECURITY-SENSITIVE VALUE**
+#
+# One-time token used for INITIAL enrollment with the EST provisioner.
+# This token authenticates the device when no existing certificate is available.
+# After successful initial enrollment, the agent uses the issued certificate
+# for all subsequent re-enrollments (mTLS authentication).
+#
+# SECURITY REQUIREMENTS:
+#   - This is a SENSITIVE SECRET and must be protected like a password
+#   - NEVER commit this value to version control (use .env files or secrets manager)
+#   - MUST be stored as an environment variable in production deployments
+#   - Should be a cryptographically random value (minimum 32 bytes / 64 hex chars)
+#
+# GENERATION COMMAND:
+#   openssl rand -hex 32
+#   # or
+#   openssl rand -base64 32
+#
+# USAGE:
+#   - Bootstrap token is ONLY used during initial enrollment
+#   - Once a certificate is issued, the token is no longer needed
+#   - Token should be single-use and revoked after enrollment if possible
+#
+# CONFIGURATION OPTIONS:
+#   1. Environment variable reference (RECOMMENDED):
+#      bootstrap_token: "${EST_BOOTSTRAP_TOKEN}"
+#
+#   2. Direct value (NOT RECOMMENDED - for testing only):
+#      bootstrap_token: "abc123def456...your-secure-token-here"
+#
+#   3. Null/empty (agent will fail if no certificate exists):
+#      bootstrap_token: null
+#
+# Environment variable override: <prefix>EST_BOOTSTRAP_TOKEN (e.g., mosquitto_eca_jwk_EST_BOOTSTRAP_TOKEN)
+bootstrap_token: "${EST_BOOTSTRAP_TOKEN}"
+
+# Notes on Additional Configuration
+# ----------------------------------
+# The following values are HARDCODED in the agent modules and cannot be
+# configured via this file or environment variables:
+#
+# - EST Provisioner Name: "default" (hardcoded in agent.ps1:214)
+#   This is the OpenXPKI EST provisioner name configured in the OpenXPKI realm.
+#   The provisioner configuration can be found at:
+#   /etc/openxpki/config.d/realm/democa/est/default.yaml in the openxpki-web container.
+#
+# These values match the Docker Compose deployment architecture and should
+# not need modification for standard deployments. If you need to change them,
+# you must modify the corresponding PowerShell module source code.
+
+# =============================================================================
+# CRL (Certificate Revocation List) Configuration
+# =============================================================================
+# CRL validation settings for certificate revocation checking
+crl:
+  # Enable CRL validation checks
+  enabled: true
+
+  # URL to download CRL from (step-ca CRL endpoint)
+  url: "http://pki:9001/crl/ca.crl"
+
+  # Local cache path for downloaded CRL
+  cache_path: "/tmp/ca.crl"
+
+  # Maximum age of cached CRL before re-download (hours)
+  max_age_hours: 2.0
+
+  # Check certificates against CRL before renewal
+  check_before_renewal: true
