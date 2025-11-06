@@ -45,12 +45,21 @@ function Get-CrlFromUrl {
     )
 
     try {
-        Write-Verbose "[CRL] Downloading CRL from: $Url"
+        Write-LogInfo "Downloading CRL" -Context @{
+            operation = "crl_download"
+            crl_url = $Url
+            cache_path = $CachePath
+            timeout_seconds = $TimeoutSeconds
+            status = "started"
+        }
 
         # Create cache directory if it doesn't exist
         $cacheDir = Split-Path -Parent $CachePath
         if (-not (Test-Path $cacheDir)) {
-            Write-Verbose "[CRL] Creating cache directory: $cacheDir"
+            Write-LogInfo "Creating CRL cache directory" -Context @{
+                operation = "crl_cache_setup"
+                cache_dir = $cacheDir
+            }
             New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
         }
 
@@ -59,15 +68,32 @@ function Get-CrlFromUrl {
 
         if (Test-Path $CachePath) {
             $fileSize = (Get-Item $CachePath).Length
-            Write-Verbose "[CRL] Download successful - Size: $fileSize bytes"
+            Write-LogInfo "CRL download successful" -Context @{
+                operation = "crl_download"
+                crl_url = $Url
+                cache_path = $CachePath
+                file_size_bytes = $fileSize
+                status = "success"
+            }
             return $true
         } else {
-            Write-Warning "[CRL] Download completed but file not found at: $CachePath"
+            Write-LogWarn "CRL download completed but file not found" -Context @{
+                operation = "crl_download"
+                crl_url = $Url
+                cache_path = $CachePath
+                status = "file_not_found"
+            }
             return $false
         }
     }
     catch {
-        Write-Warning "[CRL] Failed to download CRL from ${Url}: $_"
+        Write-LogError "Failed to download CRL" -Context @{
+            operation = "crl_download"
+            crl_url = $Url
+            cache_path = $CachePath
+            error = $_.Exception.Message
+            status = "failed"
+        }
         return $false
     }
 }
@@ -90,18 +116,33 @@ function Get-CrlAge {
     )
 
     if (-not (Test-Path $CrlPath)) {
-        Write-Verbose "[CRL] CRL file not found: $CrlPath"
+        Write-LogInfo "CRL file not found" -Context @{
+            operation = "crl_age_check"
+            crl_path = $CrlPath
+            status = "not_found"
+        }
         return -1.0
     }
 
     try {
         $lastWrite = (Get-Item $CrlPath).LastWriteTime
         $age = (Get-Date) - $lastWrite
-        Write-Verbose "[CRL] CRL age: $($age.TotalHours) hours"
+        Write-LogInfo "CRL age checked" -Context @{
+            operation = "crl_age_check"
+            crl_path = $CrlPath
+            age_hours = [math]::Round($age.TotalHours, 2)
+            last_write = $lastWrite.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            status = "success"
+        }
         return $age.TotalHours
     }
     catch {
-        Write-Warning "[CRL] Failed to get CRL age: $_"
+        Write-LogError "Failed to get CRL age" -Context @{
+            operation = "crl_age_check"
+            crl_path = $CrlPath
+            error = $_.Exception.Message
+            status = "failed"
+        }
         return -1.0
     }
 }
@@ -129,7 +170,11 @@ function Get-CrlInfo {
     )
 
     if (-not (Test-Path $CrlPath)) {
-        Write-Warning "[CRL] CRL file not found: $CrlPath"
+        Write-LogWarn "CRL file not found for parsing" -Context @{
+            operation = "crl_parse"
+            crl_path = $CrlPath
+            status = "not_found"
+        }
         return $null
     }
 
@@ -145,7 +190,11 @@ function Get-CrlInfo {
         $opensslAvailable = Get-Command openssl -ErrorAction SilentlyContinue
 
         if ($opensslAvailable) {
-            Write-Verbose "[CRL] Using openssl to parse CRL"
+            Write-LogInfo "Parsing CRL using openssl" -Context @{
+                operation = "crl_parse"
+                crl_path = $CrlPath
+                parser = "openssl"
+            }
 
             # Determine format (DER or PEM)
             $format = "DER"
@@ -158,7 +207,13 @@ function Get-CrlInfo {
             $crlText = & openssl crl -inform $format -in $CrlPath -noout -text 2>&1
 
             if ($LASTEXITCODE -ne 0) {
-                Write-Warning "[CRL] openssl failed to parse CRL"
+                Write-LogError "openssl failed to parse CRL" -Context @{
+                    operation = "crl_parse"
+                    crl_path = $CrlPath
+                    parser = "openssl"
+                    exit_code = $LASTEXITCODE
+                    status = "failed"
+                }
                 return $null
             }
 
@@ -183,6 +238,17 @@ function Get-CrlInfo {
                 }
             }
 
+            Write-LogInfo "CRL parsed successfully" -Context @{
+                operation = "crl_parse"
+                crl_path = $CrlPath
+                issuer = $issuer
+                this_update = $thisUpdate
+                next_update = $nextUpdate
+                revoked_count = $revokedSerials.Count
+                revoked_serials = ($revokedSerials -join ",")
+                status = "success"
+            }
+
             return @{
                 Issuer        = $issuer
                 ThisUpdate    = $thisUpdate
@@ -191,7 +257,12 @@ function Get-CrlInfo {
                 RevokedSerials = $revokedSerials
             }
         } else {
-            Write-Warning "[CRL] openssl not available - returning basic info only"
+            Write-LogWarn "openssl not available for CRL parsing" -Context @{
+                operation = "crl_parse"
+                crl_path = $CrlPath
+                parser = "openssl"
+                status = "unavailable"
+            }
             return @{
                 Issuer        = "Unknown (openssl not available)"
                 ThisUpdate    = "Unknown"
@@ -202,7 +273,12 @@ function Get-CrlInfo {
         }
     }
     catch {
-        Write-Warning "[CRL] Failed to parse CRL: $_"
+        Write-LogError "Failed to parse CRL" -Context @{
+            operation = "crl_parse"
+            crl_path = $CrlPath
+            error = $_.Exception.Message
+            status = "failed"
+        }
         return $null
     }
 }
@@ -229,33 +305,64 @@ function Test-CertificateRevoked {
     )
 
     if (-not (Test-Path $CertificatePath)) {
-        Write-Warning "[CRL] Certificate file not found: $CertificatePath"
+        Write-LogWarn "Certificate file not found for revocation check" -Context @{
+            operation = "certificate_revocation_check"
+            cert_path = $CertificatePath
+            status = "cert_not_found"
+        }
         return $null
     }
 
     if (-not (Test-Path $CrlPath)) {
-        Write-Warning "[CRL] CRL file not found: $CrlPath"
+        Write-LogWarn "CRL file not found for revocation check" -Context @{
+            operation = "certificate_revocation_check"
+            cert_path = $CertificatePath
+            crl_path = $CrlPath
+            status = "crl_not_found"
+        }
         return $null
     }
 
     try {
-        Write-Verbose "[CRL] Checking if certificate is revoked: $CertificatePath"
+        Write-LogInfo "Checking certificate revocation status" -Context @{
+            operation = "certificate_revocation_check"
+            cert_path = $CertificatePath
+            crl_path = $CrlPath
+            status = "started"
+        }
 
         # Load certificate to get serial number
         $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($CertificatePath)
         $certSerial = $cert.SerialNumber
+        $certThumbprint = $cert.Thumbprint
+        $certSubject = $cert.Subject
 
-        Write-Verbose "[CRL] Certificate serial number: $certSerial"
+        Write-LogInfo "Certificate loaded for revocation check" -Context @{
+            operation = "certificate_revocation_check"
+            cert_serial = $certSerial
+            cert_thumbprint = $certThumbprint
+            cert_subject = $certSubject
+        }
 
         # Get CRL information
         $crlInfo = Get-CrlInfo -CrlPath $CrlPath
 
         if ($null -eq $crlInfo) {
-            Write-Warning "[CRL] Failed to parse CRL"
+            Write-LogError "Failed to parse CRL for revocation check" -Context @{
+                operation = "certificate_revocation_check"
+                cert_serial = $certSerial
+                crl_path = $CrlPath
+                status = "crl_parse_failed"
+            }
             return $null
         }
 
-        Write-Verbose "[CRL] CRL contains $($crlInfo.RevokedCount) revoked certificates"
+        Write-LogInfo "CRL loaded for revocation check" -Context @{
+            operation = "certificate_revocation_check"
+            cert_serial = $certSerial
+            crl_revoked_count = $crlInfo.RevokedCount
+            crl_issuer = $crlInfo.Issuer
+        }
 
         # Check if certificate serial is in revoked list
         # Note: Serial numbers may have different formats (with/without colons, different case)
@@ -266,16 +373,39 @@ function Test-CertificateRevoked {
             $normalizedRevokedSerial = $revokedSerial -replace ':', '' -replace ' ', ''
 
             if ($normalizedCertSerial -eq $normalizedRevokedSerial) {
-                Write-Warning "[CRL] Certificate is REVOKED (serial: $certSerial)"
+                Write-LogWarn "Certificate is REVOKED" -Context @{
+                    operation = "certificate_revocation_check"
+                    cert_serial = $certSerial
+                    cert_thumbprint = $certThumbprint
+                    cert_subject = $certSubject
+                    crl_path = $CrlPath
+                    revoked = $true
+                    status = "revoked"
+                }
                 return $true
             }
         }
 
-        Write-Verbose "[CRL] Certificate is VALID (not in CRL)"
+        Write-LogInfo "Certificate is VALID (not in CRL)" -Context @{
+            operation = "certificate_revocation_check"
+            cert_serial = $certSerial
+            cert_thumbprint = $certThumbprint
+            cert_subject = $certSubject
+            crl_path = $CrlPath
+            crl_revoked_count = $crlInfo.RevokedCount
+            revoked = $false
+            status = "valid"
+        }
         return $false
     }
     catch {
-        Write-Warning "[CRL] Failed to check certificate revocation status: $_"
+        Write-LogError "Failed to check certificate revocation status" -Context @{
+            operation = "certificate_revocation_check"
+            cert_path = $CertificatePath
+            crl_path = $CrlPath
+            error = $_.Exception.Message
+            status = "failed"
+        }
         return $null
     }
 }
@@ -322,13 +452,31 @@ function Update-CrlCache {
         $needsUpdate = $false
 
         if ($crlAge -lt 0) {
-            Write-Verbose "[CRL] CRL cache missing - downloading"
+            Write-LogInfo "CRL cache missing, download required" -Context @{
+                operation = "crl_cache_update"
+                crl_url = $Url
+                cache_path = $CachePath
+                status = "cache_missing"
+            }
             $needsUpdate = $true
         } elseif ($crlAge -gt $MaxAgeHours) {
-            Write-Verbose "[CRL] CRL cache stale (age: $crlAge hours, max: $MaxAgeHours) - downloading"
+            Write-LogInfo "CRL cache stale, download required" -Context @{
+                operation = "crl_cache_update"
+                crl_url = $Url
+                cache_path = $CachePath
+                age_hours = [math]::Round($crlAge, 2)
+                max_age_hours = $MaxAgeHours
+                status = "cache_stale"
+            }
             $needsUpdate = $true
         } else {
-            Write-Verbose "[CRL] CRL cache fresh (age: $crlAge hours)"
+            Write-LogInfo "CRL cache fresh, no update needed" -Context @{
+                operation = "crl_cache_update"
+                cache_path = $CachePath
+                age_hours = [math]::Round($crlAge, 2)
+                max_age_hours = $MaxAgeHours
+                status = "cache_fresh"
+            }
         }
 
         if ($needsUpdate) {
@@ -338,10 +486,21 @@ function Update-CrlCache {
             if ($downloaded) {
                 $result.Updated = $true
                 $result.CrlAge = 0.0
-                Write-Verbose "[CRL] CRL cache updated successfully"
+                Write-LogInfo "CRL cache updated successfully" -Context @{
+                    operation = "crl_cache_update"
+                    crl_url = $Url
+                    cache_path = $CachePath
+                    status = "updated"
+                }
             } else {
                 $result.Error = "Failed to download CRL"
-                Write-Warning "[CRL] Failed to update CRL cache"
+                Write-LogError "Failed to update CRL cache" -Context @{
+                    operation = "crl_cache_update"
+                    crl_url = $Url
+                    cache_path = $CachePath
+                    error = "Download failed"
+                    status = "failed"
+                }
                 return $result
             }
         }
@@ -352,14 +511,27 @@ function Update-CrlCache {
         if ($null -ne $crlInfo) {
             $result.RevokedCount = $crlInfo.RevokedCount
             $result.NextUpdate = $crlInfo.NextUpdate
-            Write-Verbose "[CRL] CRL info: $($crlInfo.RevokedCount) revoked certs, next update: $($crlInfo.NextUpdate)"
+            Write-LogInfo "CRL cache information retrieved" -Context @{
+                operation = "crl_cache_update"
+                cache_path = $CachePath
+                revoked_count = $crlInfo.RevokedCount
+                next_update = $crlInfo.NextUpdate
+                issuer = $crlInfo.Issuer
+                status = "success"
+            }
         }
 
         return $result
     }
     catch {
         $result.Error = $_.Exception.Message
-        Write-Warning "[CRL] Error updating CRL cache: $_"
+        Write-LogError "Error updating CRL cache" -Context @{
+            operation = "crl_cache_update"
+            crl_url = $Url
+            cache_path = $CachePath
+            error = $_.Exception.Message
+            status = "failed"
+        }
         return $result
     }
 }

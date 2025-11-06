@@ -54,7 +54,11 @@ function Step-MonitorCertificate {
     $config = $Context.Config
     $state = $Context.State
 
-    Write-Verbose "[EST:Monitor] Checking certificate status..."
+    Write-LogInfo "Checking certificate status" -Context @{
+        step = "Monitor"
+        agent_type = "est"
+        operation = "certificate_check"
+    }
 
     $certPath = $config.cert_path
     $certExists = Test-Path $certPath
@@ -62,19 +66,34 @@ function Step-MonitorCertificate {
     $state.CertificateStatus.Exists = $certExists
 
     if ($certExists) {
-        Write-Verbose "[EST:Monitor] Certificate exists at: $certPath"
+        Write-LogInfo "Certificate exists" -Context @{
+            step = "Monitor"
+            agent_type = "est"
+            cert_path = $certPath
+            operation = "certificate_check"
+        }
 
         # Get certificate expiry and lifetime percentage
         $certInfo = Get-CertificateInfo -Path $certPath
         $state.CertificateStatus.ExpiryDate = $certInfo.ExpiryDate
         $state.CertificateStatus.LifetimePercentage = $certInfo.LifetimePercentage
 
-        Write-Verbose "[EST:Monitor] Certificate expires: $($certInfo.ExpiryDate)"
-        Write-Verbose "[EST:Monitor] Lifetime used: $($certInfo.LifetimePercentage)%"
+        Write-LogInfo "Certificate expiry and lifetime status" -Context @{
+            step = "Monitor"
+            agent_type = "est"
+            expiry_date = $certInfo.ExpiryDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            lifetime_percentage = $certInfo.LifetimePercentage
+            operation = "certificate_check"
+        }
 
         # Check CRL revocation status (if enabled)
         if ($config.crl.enabled) {
-            Write-Verbose "[EST:Monitor] Checking CRL revocation status..."
+            Write-LogInfo "Checking CRL revocation status" -Context @{
+                step = "Monitor"
+                agent_type = "est"
+                crl_url = $config.crl.url
+                operation = "crl_check"
+            }
 
             # Update CRL cache
             $crlResult = Update-CrlCache `
@@ -91,12 +110,31 @@ function Step-MonitorCertificate {
                 $state.CertificateStatus.Revoked = ($revoked -eq $true)
 
                 if ($state.CertificateStatus.Revoked) {
-                    Write-Warning "[EST:Monitor] Certificate is REVOKED! Immediate re-enrollment required."
+                    Write-LogWarn "Certificate is REVOKED! Immediate re-enrollment required" -Context @{
+                        step = "Monitor"
+                        agent_type = "est"
+                        cert_path = $certPath
+                        revoked = $true
+                        operation = "crl_check"
+                        status = "revoked"
+                    }
                 } else {
-                    Write-Verbose "[EST:Monitor] Certificate is not revoked"
+                    Write-LogInfo "Certificate is not revoked" -Context @{
+                        step = "Monitor"
+                        agent_type = "est"
+                        revoked = $false
+                        operation = "crl_check"
+                        status = "valid"
+                    }
                 }
             } else {
-                Write-Warning "[EST:Monitor] Failed to update CRL, skipping revocation check"
+                Write-LogWarn "Failed to update CRL, skipping revocation check" -Context @{
+                    step = "Monitor"
+                    agent_type = "est"
+                    crl_url = $config.crl.url
+                    operation = "crl_check"
+                    status = "failed"
+                }
             }
         }
 
@@ -107,12 +145,33 @@ function Step-MonitorCertificate {
             $state.CertificateStatus.Revoked
 
         if ($state.CertificateStatus.RenewalRequired) {
-            Write-Verbose "[EST:Monitor] Re-enrollment required (threshold: $renewalThreshold%)"
+            Write-LogInfo "Re-enrollment required" -Context @{
+                step = "Monitor"
+                agent_type = "est"
+                renewal_threshold_pct = $renewalThreshold
+                lifetime_percentage = $state.CertificateStatus.LifetimePercentage
+                revoked = $state.CertificateStatus.Revoked
+                operation = "renewal_check"
+                status = "required"
+            }
         } else {
-            Write-Verbose "[EST:Monitor] Certificate is valid, no re-enrollment needed"
+            Write-LogInfo "Certificate is valid, no re-enrollment needed" -Context @{
+                step = "Monitor"
+                agent_type = "est"
+                lifetime_percentage = $state.CertificateStatus.LifetimePercentage
+                renewal_threshold_pct = $renewalThreshold
+                operation = "renewal_check"
+                status = "valid"
+            }
         }
     } else {
-        Write-Verbose "[EST:Monitor] Certificate does not exist, enrollment required"
+        Write-LogInfo "Certificate does not exist, enrollment required" -Context @{
+            step = "Monitor"
+            agent_type = "est"
+            cert_path = $certPath
+            operation = "certificate_check"
+            status = "missing"
+        }
         $state.CertificateStatus.RenewalRequired = $true
     }
 
@@ -168,8 +227,14 @@ function Step-DecideAction {
         $decision.Reason = "Certificate is valid and not due for re-enrollment"
     }
 
-    Write-Verbose "[EST:Decide] Action: $($decision.Action) - $($decision.Reason)"
-    Write-Verbose "[EST:Decide] Auth mode: $($decision.AuthMode)"
+    Write-LogInfo "Decision made" -Context @{
+        step = "Decide"
+        agent_type = "est"
+        action = $decision.Action
+        reason = $decision.Reason
+        auth_mode = $decision.AuthMode
+        operation = "decision"
+    }
 
     return $decision
 }
@@ -204,14 +269,27 @@ function Step-ExecuteEstProtocol {
     }
 
     if ($action -eq "skip") {
-        Write-Verbose "[EST:Execute] Skipping EST protocol execution"
+        Write-LogInfo "Skipping EST protocol execution" -Context @{
+            step = "Execute"
+            agent_type = "est"
+            action = "skip"
+            operation = "est_protocol"
+            status = "skipped"
+        }
         return @{
             Action = "skip"
             Success = $true
         }
     }
 
-    Write-Verbose "[EST:Execute] Executing EST protocol: $action (auth: $authMode)"
+    Write-LogInfo "Executing EST protocol" -Context @{
+        step = "Execute"
+        agent_type = "est"
+        action = $action
+        auth_mode = $authMode
+        operation = "est_protocol"
+        status = "started"
+    }
 
     try {
         # Determine device name (for CSR subject)
@@ -225,16 +303,33 @@ function Step-ExecuteEstProtocol {
 
         if ($action -eq "enroll") {
             # Initial Enrollment using bootstrap token
-            Write-Verbose "[EST:Execute] Performing initial enrollment..."
+            Write-LogInfo "Performing initial enrollment" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                device_name = $deviceName
+                operation = "est_enrollment"
+                enrollment_type = "initial"
+                status = "started"
+            }
 
             # Generate RSA key pair (2048-bit)
             $rsa = [System.Security.Cryptography.RSA]::Create(2048)
-            Write-Verbose "[EST:Execute] RSA key pair generated (2048-bit)"
+            Write-LogInfo "RSA key pair generated" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                key_size = 2048
+                operation = "key_generation"
+            }
 
             # Generate CSR
             $subjectDN = "CN=$deviceName"
             $csrPem = New-CertificateRequest -SubjectDN $subjectDN -SubjectAlternativeNames @() -RsaKey $rsa
-            Write-Verbose "[EST:Execute] CSR generated with subject: $subjectDN"
+            Write-LogInfo "CSR generated" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                subject = $subjectDN
+                operation = "csr_generation"
+            }
 
             # Get bootstrap token
             $bootstrapToken = Get-BootstrapToken -Config $config
@@ -248,7 +343,11 @@ function Step-ExecuteEstProtocol {
 
             # Export private key
             $keyPem = Export-PrivateKey -RsaKey $rsa
-            Write-Verbose "[EST:Execute] Private key exported to PEM format"
+            Write-LogInfo "Private key exported to PEM format" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                operation = "key_export"
+            }
 
             # Save certificate and key
             Write-FileAtomic -Path $config.cert_path -Content $certPem
@@ -264,9 +363,16 @@ function Step-ExecuteEstProtocol {
             $tempCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempCertFile)
             Remove-Item $tempCertFile -Force -ErrorAction SilentlyContinue
 
-            Write-Verbose "[EST:Execute] Initial enrollment successful"
-            Write-Verbose "[EST:Execute] Subject: $($tempCert.Subject)"
-            Write-Verbose "[EST:Execute] NotAfter: $($tempCert.NotAfter)"
+            Write-LogInfo "Initial enrollment successful" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                subject = $tempCert.Subject
+                not_after = $tempCert.NotAfter.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                cert_path = $config.cert_path
+                operation = "est_enrollment"
+                enrollment_type = "initial"
+                status = "success"
+            }
 
             return @{
                 Action = $action
@@ -281,11 +387,23 @@ function Step-ExecuteEstProtocol {
         }
         elseif ($action -eq "reenroll") {
             # Re-enrollment using mTLS with existing certificate
-            Write-Verbose "[EST:Execute] Performing re-enrollment with key rotation..."
+            Write-LogInfo "Performing re-enrollment with key rotation" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                operation = "est_reenrollment"
+                enrollment_type = "reenrollment"
+                auth_mode = $authMode
+                status = "started"
+            }
 
             # Generate NEW RSA key pair (key rotation best practice)
             $newRsa = [System.Security.Cryptography.RSA]::Create(2048)
-            Write-Verbose "[EST:Execute] New RSA key pair generated (2048-bit)"
+            Write-LogInfo "New RSA key pair generated" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                key_size = 2048
+                operation = "key_generation"
+            }
 
             # Get subject from existing certificate
             $existingCertInfo = Get-CertificateInfo -Path $config.cert_path
@@ -293,7 +411,12 @@ function Step-ExecuteEstProtocol {
 
             # Generate CSR with same subject as existing certificate
             $csrPem = New-CertificateRequest -SubjectDN $subjectDN -SubjectAlternativeNames @() -RsaKey $newRsa
-            Write-Verbose "[EST:Execute] CSR generated for re-enrollment with subject: $subjectDN"
+            Write-LogInfo "CSR generated for re-enrollment" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                subject = $subjectDN
+                operation = "csr_generation"
+            }
 
             if ($authMode -eq "bootstrap") {
                 # Use bootstrap token for re-enrollment (e.g., if cert was revoked)
@@ -315,7 +438,11 @@ function Step-ExecuteEstProtocol {
 
             # Export new private key
             $newKeyPem = Export-PrivateKey -RsaKey $newRsa
-            Write-Verbose "[EST:Execute] New private key exported to PEM format"
+            Write-LogInfo "New private key exported to PEM format" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                operation = "key_export"
+            }
 
             # Atomic replacement: write to temp files first, then move
             Write-FileAtomic -Path "$($config.cert_path).new" -Content $newCertPem
@@ -336,9 +463,17 @@ function Step-ExecuteEstProtocol {
             $tempCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempCertFile)
             Remove-Item $tempCertFile -Force -ErrorAction SilentlyContinue
 
-            Write-Verbose "[EST:Execute] Re-enrollment successful"
-            Write-Verbose "[EST:Execute] Subject: $($tempCert.Subject)"
-            Write-Verbose "[EST:Execute] NotAfter: $($tempCert.NotAfter)"
+            Write-LogInfo "Re-enrollment successful" -Context @{
+                step = "Execute"
+                agent_type = "est"
+                subject = $tempCert.Subject
+                not_after = $tempCert.NotAfter.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                cert_path = $config.cert_path
+                auth_mode = $authMode
+                operation = "est_reenrollment"
+                enrollment_type = "reenrollment"
+                status = "success"
+            }
 
             return @{
                 Action = $action
@@ -356,7 +491,16 @@ function Step-ExecuteEstProtocol {
         }
     }
     catch {
-        Write-Error "[EST:Execute] EST protocol execution failed: $_"
+        Write-LogError "EST protocol execution failed" -Context @{
+            step = "Execute"
+            agent_type = "est"
+            action = $action
+            auth_mode = $authMode
+            cert_path = $config.cert_path
+            error = $_.Exception.Message
+            operation = "est_protocol"
+            status = "failed"
+        }
         return @{
             Action = $action
             AuthMode = $authMode
@@ -389,7 +533,14 @@ function Step-ValidateDeployment {
     $certPath = $config.cert_path
     $keyPath = $config.key_path
 
-    Write-Verbose "[EST:Validate] Validating certificate deployment..."
+    Write-LogInfo "Validating certificate deployment" -Context @{
+        step = "Validate"
+        agent_type = "est"
+        cert_path = $certPath
+        key_path = $keyPath
+        operation = "deployment_validation"
+        status = "started"
+    }
 
     $result = @{
         CertificateValid = $false
@@ -400,9 +551,21 @@ function Step-ValidateDeployment {
     # Validate certificate file exists
     if (Test-Path $certPath) {
         $result.CertificateValid = $true
-        Write-Verbose "[EST:Validate] Certificate file exists"
+        Write-LogInfo "Certificate file exists" -Context @{
+            step = "Validate"
+            agent_type = "est"
+            cert_path = $certPath
+            operation = "file_validation"
+            status = "success"
+        }
     } else {
-        Write-Warning "[EST:Validate] Certificate file not found: $certPath"
+        Write-LogWarn "Certificate file not found" -Context @{
+            step = "Validate"
+            agent_type = "est"
+            cert_path = $certPath
+            operation = "file_validation"
+            status = "failed"
+        }
         $result.Message = "Certificate file not found"
         return $result
     }
@@ -410,9 +573,21 @@ function Step-ValidateDeployment {
     # Validate private key file exists
     if (Test-Path $keyPath) {
         $result.KeyValid = $true
-        Write-Verbose "[EST:Validate] Private key file exists"
+        Write-LogInfo "Private key file exists" -Context @{
+            step = "Validate"
+            agent_type = "est"
+            key_path = $keyPath
+            operation = "file_validation"
+            status = "success"
+        }
     } else {
-        Write-Warning "[EST:Validate] Private key file not found: $keyPath"
+        Write-LogWarn "Private key file not found" -Context @{
+            step = "Validate"
+            agent_type = "est"
+            key_path = $keyPath
+            operation = "file_validation"
+            status = "failed"
+        }
         $result.Message = "Private key file not found"
         return $result
     }
@@ -444,7 +619,11 @@ function Initialize-EstWorkflowSteps {
     [CmdletBinding()]
     param()
 
-    Write-Verbose "[EST:Init] Initializing EST workflow steps..."
+    Write-LogInfo "Initializing EST workflow steps" -Context @{
+        agent_type = "est"
+        operation = "workflow_init"
+        status = "started"
+    }
 
     # NOTE: WorkflowOrchestrator is already imported by est-agent.ps1 before this module loads
 
@@ -490,7 +669,12 @@ function Initialize-EstWorkflowSteps {
             Step-ValidateDeployment -Context $Context
         }
 
-    Write-Verbose "[EST:Init] EST workflow steps registered"
+    Write-LogInfo "EST workflow steps registered" -Context @{
+        agent_type = "est"
+        operation = "workflow_init"
+        status = "completed"
+        steps_registered = 4
+    }
 }
 
 # ==============================================================================

@@ -98,7 +98,10 @@ function New-WorkflowContext {
         $script:WorkflowMetrics.StartTime = Get-Date
     }
 
-    Write-Verbose "[Workflow] Context created with config: $($Config.Keys -join ', ')"
+    Write-LogInfo "Workflow context created" -Context @{
+        operation = "workflow_context_creation"
+        config_keys = ($Config.Keys -join ', ')
+    }
     return $context
 }
 
@@ -132,7 +135,11 @@ function Register-WorkflowStep {
     )
 
     if ($script:RegisteredSteps.ContainsKey($Name)) {
-        Write-Warning "[Workflow] Step '$Name' already registered, overwriting"
+        Write-LogWarn "Step already registered, overwriting" -Context @{
+            operation = "workflow_step_registration"
+            step_name = $Name
+            status = "overwriting"
+        }
     }
 
     $script:RegisteredSteps[$Name] = @{
@@ -144,7 +151,12 @@ function Register-WorkflowStep {
         TotalExecutionTime = [TimeSpan]::Zero
     }
 
-    Write-Verbose "[Workflow] Registered step: $Name"
+    Write-LogInfo "Workflow step registered" -Context @{
+        operation = "workflow_step_registration"
+        step_name = $Name
+        description = $Description
+        continue_on_error = $ContinueOnError
+    }
 }
 
 # ==============================================================================
@@ -185,7 +197,11 @@ function Invoke-WorkflowStep {
     }
 
     try {
-        Write-Verbose "[Workflow] Executing step: $Name"
+        Write-LogInfo "Executing workflow step" -Context @{
+            operation = "workflow_step_execution"
+            step_name = $Name
+            status = "started"
+        }
 
         # Measure execution time
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -209,7 +225,12 @@ function Invoke-WorkflowStep {
         }
         $script:WorkflowMetrics.StepExecutionTimes[$Name].Add($result.ExecutionTime)
 
-        Write-Verbose "[Workflow] Step '$Name' completed in $($result.ExecutionTime.TotalMilliseconds)ms"
+        Write-LogInfo "Workflow step completed" -Context @{
+            operation = "workflow_step_execution"
+            step_name = $Name
+            execution_time_ms = [math]::Round($result.ExecutionTime.TotalMilliseconds, 2)
+            status = "success"
+        }
     }
     catch {
         $sw.Stop()
@@ -222,9 +243,21 @@ function Invoke-WorkflowStep {
         $script:WorkflowMetrics.LastError = $_
 
         if ($step.ContinueOnError) {
-            Write-Warning "[Workflow] Step '$Name' failed but continuing: $_"
+            Write-LogWarn "Workflow step failed but continuing" -Context @{
+                operation = "workflow_step_execution"
+                step_name = $Name
+                error = $_.Exception.Message
+                continue_on_error = $true
+                status = "failed_continuing"
+            }
         } else {
-            Write-Error "[Workflow] Step '$Name' failed: $_"
+            Write-LogError "Workflow step failed" -Context @{
+                operation = "workflow_step_execution"
+                step_name = $Name
+                error = $_.Exception.Message
+                continue_on_error = $false
+                status = "failed"
+            }
             throw
         }
     }
@@ -266,8 +299,13 @@ function Start-WorkflowLoop {
 
     $context.State.WorkflowStatus = "Running"
 
-    Write-Verbose "[Workflow] Starting workflow loop with steps: $($Steps -join ', ')"
-    Write-Verbose "[Workflow] Interval: ${IntervalSeconds}s, Max iterations: $MaxIterations"
+    Write-LogInfo "Starting workflow loop" -Context @{
+        operation = "workflow_loop"
+        steps = ($Steps -join ', ')
+        interval_seconds = $IntervalSeconds
+        max_iterations = $MaxIterations
+        status = "started"
+    }
 
     $iterationCount = 0
 
@@ -280,7 +318,11 @@ function Start-WorkflowLoop {
         $iterationSuccess = $true
 
         try {
-            Write-Verbose "[Workflow] ========== Iteration $iterationCount =========="
+            Write-LogInfo "Workflow iteration started" -Context @{
+                operation = "workflow_iteration"
+                iteration = $iterationCount
+                status = "started"
+            }
 
             # Execute each step in sequence
             foreach ($stepName in $Steps) {
@@ -293,13 +335,24 @@ function Start-WorkflowLoop {
                         # Check if we should stop on this error
                         $step = $script:RegisteredSteps[$stepName]
                         if (-not $step.ContinueOnError) {
-                            Write-Error "[Workflow] Critical step failed, stopping iteration"
+                            Write-LogError "Critical step failed, stopping iteration" -Context @{
+                                operation = "workflow_iteration"
+                                iteration = $iterationCount
+                                step_name = $stepName
+                                status = "critical_failure"
+                            }
                             break
                         }
                     }
                 }
                 catch {
-                    Write-Error "[Workflow] Step '$stepName' threw exception: $_"
+                    Write-LogError "Step threw exception" -Context @{
+                        operation = "workflow_iteration"
+                        iteration = $iterationCount
+                        step_name = $stepName
+                        error = $_.Exception.Message
+                        status = "exception"
+                    }
                     $iterationSuccess = $false
                     break
                 }
@@ -323,20 +376,38 @@ function Start-WorkflowLoop {
                 Success = $iterationSuccess
             })
 
-            Write-Verbose "[Workflow] Iteration $iterationCount completed in $($iterationDuration.TotalSeconds)s"
+            Write-LogInfo "Workflow iteration completed" -Context @{
+                operation = "workflow_iteration"
+                iteration = $iterationCount
+                duration_seconds = [math]::Round($iterationDuration.TotalSeconds, 2)
+                success = $iterationSuccess
+                status = "completed"
+            }
 
             # Check if we've reached max iterations
             if ($MaxIterations -gt 0 -and $iterationCount -ge $MaxIterations) {
-                Write-Verbose "[Workflow] Reached max iterations ($MaxIterations), stopping"
+                Write-LogInfo "Reached max iterations, stopping" -Context @{
+                    operation = "workflow_loop"
+                    max_iterations = $MaxIterations
+                    status = "max_iterations_reached"
+                }
                 break
             }
 
             # Sleep before next iteration
-            Write-Verbose "[Workflow] Sleeping for ${IntervalSeconds}s..."
+            Write-LogInfo "Sleeping before next iteration" -Context @{
+                operation = "workflow_loop"
+                sleep_seconds = $IntervalSeconds
+            }
             Start-Sleep -Seconds $IntervalSeconds
         }
         catch {
-            Write-Error "[Workflow] Iteration $iterationCount failed with exception: $_"
+            Write-LogError "Iteration failed with exception" -Context @{
+                operation = "workflow_iteration"
+                iteration = $iterationCount
+                error = $_.Exception.Message
+                status = "failed"
+            }
             $script:WorkflowMetrics.FailedIterations++
             $context.State.WorkflowStatus = "Error"
 
@@ -346,7 +417,11 @@ function Start-WorkflowLoop {
     }
 
     $context.State.WorkflowStatus = "Stopped"
-    Write-Verbose "[Workflow] Workflow loop terminated after $iterationCount iterations"
+    Write-LogInfo "Workflow loop terminated" -Context @{
+        operation = "workflow_loop"
+        total_iterations = $iterationCount
+        status = "stopped"
+    }
 }
 
 # ==============================================================================
@@ -429,7 +504,9 @@ function Reset-WorkflowMetrics {
         $script:RegisteredSteps[$stepName].LastExecutionTime = $null
     }
 
-    Write-Verbose "[Workflow] Metrics reset"
+    Write-LogInfo "Workflow metrics reset" -Context @{
+        operation = "workflow_metrics_reset"
+    }
 }
 
 # ==============================================================================
