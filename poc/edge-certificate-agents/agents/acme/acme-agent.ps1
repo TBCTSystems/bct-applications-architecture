@@ -112,9 +112,6 @@ Write-Host "[ACME:Main] Workflow context created" -ForegroundColor Green
 # ==============================================================================
 # Workflow Execution
 # ==============================================================================
-Write-Host "[ACME:Main] Starting workflow orchestrator..." -ForegroundColor Cyan
-Write-Host "[ACME:Main] Press Ctrl+C to stop" -ForegroundColor Yellow
-
 # Define workflow steps in execution order
 $workflowSteps = @(
     "Monitor",   # Check certificate status
@@ -125,6 +122,7 @@ $workflowSteps = @(
 
 try {
     # Start workflow loop (runs indefinitely)
+    # NOTE: Removed Write-Host calls here as they can block with Docker logging driver
     Start-WorkflowLoop `
         -Context $workflowContext `
         -Steps $workflowSteps `
