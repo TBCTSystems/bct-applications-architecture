@@ -1,0 +1,43 @@
+erDiagram
+    CertificateFile {
+        string file_path PK "Absolute path to certificate file on Docker volume (e.g., /certs/server/server.crt)"
+        string subject_dn "Distinguished Name of certificate holder"
+        string sans "Subject Alternative Names - array of DNS names and IP addresses"
+        string issuer_dn "Distinguished Name of the Certificate Authority"
+        string serial_number "Unique certificate identifier assigned by CA"
+        timestamp not_before "Certificate validity start timestamp"
+        timestamp not_after "Certificate expiry timestamp"
+        string public_key_pem "Public key in PEM format"
+    }
+
+    PrivateKeyFile {
+        string file_path PK "Absolute path to private key file on Docker volume (e.g., /certs/server/server.key)"
+        string key_type "Key algorithm type - RSA or ECDSA"
+        int key_size "Key size in bits (2048/4096 for RSA, 256/384 for ECDSA)"
+        string key_pem "Private key in PEM format (PKCS#8 or PKCS#1) - sensitive, restricted permissions 0600"
+    }
+
+    AgentConfiguration {
+        string agent_id PK "Unique identifier for the agent instance"
+        string pki_url "Base URL of step-ca API endpoint"
+        string cert_path "File path to certificate file managed by this agent"
+        string key_path "File path to private key file managed by this agent"
+        string domain_name "Subject Common Name or SAN for certificate"
+        int renewal_threshold_pct "Percentage of certificate lifetime to trigger renewal (e.g., 75)"
+        int check_interval_sec "Interval in seconds between certificate expiry checks"
+        string bootstrap_token "One-time enrollment token for initial EST enrollment - nullable, sensitive"
+    }
+
+    CACertificateRecord {
+        string serial_number PK "Unique identifier for issued certificate in CA database"
+        string subject_dn "Distinguished Name of certificate subject"
+        string issuer_dn "Distinguished Name of issuing Certificate Authority"
+        timestamp issued_at "Timestamp when certificate was issued"
+        timestamp expires_at "Timestamp when certificate expires"
+        boolean revoked "Certificate revocation status flag"
+        timestamp revoked_at "Timestamp of certificate revocation - nullable, only set if revoked is true"
+    }
+
+    CertificateFile ||--|| PrivateKeyFile : "paired with"
+    AgentConfiguration ||--o{ CertificateFile : "manages lifecycle"
+    CertificateFile }o--|| CACertificateRecord : "issued by"

@@ -1,0 +1,85 @@
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as Agent Loop
+    participant Monitor as Certificate Monitor
+    participant Engine as Renewal Engine
+    participant EST as EST Client
+    participant Crypto as Crypto Helper
+    participant Config as Config Manager
+    participant PKI as step-ca PKI
+    participant Installer as Certificate Installer
+    participant Volume as Shared Volume (/certs/client)
+
+    Agent->>Monitor: Check certificate status
+    Monitor->>Volume: Read client.crt
+    Volume-->>Monitor: 404 (file missing)
+    Monitor-->>Agent: No certificate present
+    Agent->>Engine: Evaluate renewal decision
+    Engine-->>Agent: Initial enrollment required
+
+    Agent->>EST: Start initial enrollment
+    EST->>Config: Load bootstrap token
+    Config-->>EST: factory-secret-token-12345
+    EST->>Crypto: Generate key pair
+    EST->>Crypto: Create CSR (CN=client-device-001)
+    EST->>PKI: POST /simpleenroll (Bearer token + CSR)
+
+    alt Bootstrap token valid
+        PKI-->>EST: 200 OK (PKCS#7 cert)
+        EST->>Crypto: Extract certificate
+        Crypto-->>EST: X509 certificate
+        EST-->>Agent: Certificate + key
+        Agent->>Installer: Publish cert/key
+        Installer->>Volume: Atomic write client.key
+        Installer->>Volume: Atomic write client.crt
+        Installer-->>Agent: Installation complete
+        Agent-->>Agent: Log success & sleep
+    else Token invalid/expired
+        PKI-->>EST: 401 Unauthorized
+        EST-->>Agent: Enrollment failed
+        Agent-->>Agent: Log error & retry later
+    end
+```
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as Agent Loop
+    participant Monitor as Certificate Monitor
+    participant Engine as Renewal Engine
+    participant EST as EST Client
+    participant Crypto as Crypto Helper
+    participant PKI as step-ca PKI
+    participant Installer as Certificate Installer
+    participant Volume as Shared Volume (/certs/client)
+
+    Agent->>Monitor: Check certificate status
+    Monitor->>Volume: Read client.crt
+    Volume-->>Monitor: Certificate PEM
+    Monitor->>Crypto: Parse certificate
+    Crypto-->>Monitor: Expiry 2025-10-24 10:08:00
+    Monitor-->>Agent: Lifetime = 78%
+    Agent->>Engine: Evaluate renewal threshold
+    Engine-->>Agent: Renewal needed (≥75%)
+
+    Agent->>EST: Start re-enrollment
+    EST->>Crypto: Generate CSR (existing key or new key)
+    EST->>PKI: POST /simplereenroll (mTLS auth)
+
+    alt Re-enrollment success
+        PKI-->>EST: 200 OK (PKCS#7 cert)
+        EST->>Crypto: Extract certificate
+        Crypto-->>EST: Renewed certificate
+        EST-->>Agent: Certificate + key
+        Agent->>Installer: Publish cert/key
+        Installer->>Volume: Atomic write client.key
+        Installer->>Volume: Atomic write client.crt
+        Installer-->>Agent: Installation complete
+        Agent-->>Agent: Log success & sleep
+    else PKI rejects request
+        PKI-->>EST: 4xx/5xx response
+        EST-->>Agent: Renewal failed
+        Agent-->>Agent: Log error, continue monitoring
+    end
+```

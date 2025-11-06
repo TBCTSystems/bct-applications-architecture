@@ -1,0 +1,84 @@
+# Example GitHub Actions workflow for automated testing
+# Rename to test.yml to enable automated CI/CD testing
+
+name: ECA Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup PowerShell
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y powershell
+
+      - name: Install Pester
+        run: |
+          pwsh -Command "Install-Module -Name Pester -MinimumVersion 5.0 -Force -Scope CurrentUser"
+
+      - name: Run Unit Tests with Coverage
+        run: |
+          chmod +x ./scripts/run-tests.sh
+          ./scripts/run-tests.sh -u -c
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./tests/coverage.xml
+          flags: unittests
+          name: codecov-eca
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup PowerShell
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y powershell
+
+      - name: Install Pester
+        run: |
+          pwsh -Command "Install-Module -Name Pester -MinimumVersion 5.0 -Force -Scope CurrentUser"
+
+      - name: Start Infrastructure
+        run: |
+          docker compose up -d pki openxpki-web openxpki-client openxpki-server
+
+      - name: Wait for Services to be Healthy
+        run: |
+          echo "Waiting for PKI services to start..."
+          sleep 60
+          docker compose ps
+          curl -k https://localhost:9000/health || echo "PKI health check failed, may need more time"
+
+      - name: Run Integration Tests
+        run: |
+          chmod +x ./scripts/run-tests.sh
+          ./scripts/run-tests.sh -i
+
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          echo "=== Service Logs ==="
+          docker compose logs
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v

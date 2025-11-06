@@ -1,0 +1,83 @@
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Editors and IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node / frontend artifacts
+node_modules/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+web-ui/dist/
+web-ui/build/
+web-ui/.vite/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.pyre/
+.cache/
+.eggs/
+*.egg-info/
+htmlcov/
+coverage/
+.coverage
+.coverage.*
+
+# Virtual environments
+/.venv
+.venv/
+venv/
+env/
+ENV/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.development.local
+.env.production
+.env.production.local
+.env.test
+.env.test.local
+.envrc
+!.env.example
+
+# Logs and reports
+logs/
+*.log
+*.log.*
+*.out
+*.err
+*.tmp
+
+# Docker / runtime volumes
+pki/secrets/*
+!pki/secrets/.gitkeep
+web-ui/views/*
+!web-ui/views/.gitkeep
+target-server/challenge/*
+!target-server/challenge/.gitkeep
+tests/fixtures/mock-certificates/*
+!tests/fixtures/mock-certificates/.gitkeep
+tests/fixtures/mock-responses/*
+!tests/fixtures/mock-responses/.gitkeep
+
+# Miscellaneous
+*.bak
+*.orig
+*_backup
