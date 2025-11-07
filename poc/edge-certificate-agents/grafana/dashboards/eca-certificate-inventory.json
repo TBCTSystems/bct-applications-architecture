@@ -69,7 +69,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"certificate_check\"} | json | lifetime_percentage > 0 | line_format \"{{.agent_type}}:{{.lifetime_percentage}}\"",
+          "expr": "{operation=\"certificate_inventory\"} | json | context_lifetime_percentage > 0 | line_format \"{{.context_agent_type}}:{{.context_lifetime_percentage}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -136,7 +136,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"certificate_check\"} | json | lifetime_percentage > 0",
+          "expr": "{operation=\"certificate_inventory\"} | json | context_lifetime_percentage > 0",
           "queryType": "range",
           "refId": "A"
         }
@@ -260,7 +260,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"certificate_check\"} | json | line_format \"{{.timestamp}} | {{.agent_type}} | Subject: {{.cert_subject}} | Thumbprint: {{.cert_thumbprint}} | Expiry: {{.expiry_date}} | Lifetime: {{.lifetime_percentage}}%\"",
+          "expr": "{operation=\"certificate_inventory\"} | json | line_format \"{{.timestamp}} | {{.context_agent_type}} | Subject: {{.context_cert_subject}} | Thumbprint: {{.context_cert_thumbprint}} | Expiry: {{.context_expiry_date}} | Lifetime: {{.context_lifetime_percentage}}%\"",
           "queryType": "range",
           "refId": "A"
         }

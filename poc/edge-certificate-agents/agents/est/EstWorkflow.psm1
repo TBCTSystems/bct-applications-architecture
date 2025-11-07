@@ -75,15 +75,19 @@ function Step-MonitorCertificate {
 
         # Get certificate expiry and lifetime percentage
         $certInfo = Get-CertificateInfo -Path $certPath
-        $state.CertificateStatus.ExpiryDate = $certInfo.ExpiryDate
-        $state.CertificateStatus.LifetimePercentage = $certInfo.LifetimePercentage
+        $state.CertificateStatus.ExpiryDate = $certInfo.NotAfter
+        $state.CertificateStatus.LifetimePercentage = $certInfo.LifetimeElapsedPercent
 
-        Write-LogInfo "Certificate expiry and lifetime status" -Context @{
+        Write-LogInfo "Certificate inventory status" -Context @{
             step = "Monitor"
             agent_type = "est"
-            expiry_date = $certInfo.ExpiryDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
-            lifetime_percentage = $certInfo.LifetimePercentage
-            operation = "certificate_check"
+            cert_subject = $certInfo.Subject
+            cert_thumbprint = $certInfo.Thumbprint
+            cert_serial = $certInfo.SerialNumber
+            expiry_date = $certInfo.NotAfter.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            lifetime_percentage = $certInfo.LifetimeElapsedPercent
+            days_remaining = $certInfo.DaysRemaining
+            operation = "certificate_inventory"
         }
 
         # Check CRL revocation status (if enabled)

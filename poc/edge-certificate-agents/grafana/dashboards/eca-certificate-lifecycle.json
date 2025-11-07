@@ -81,7 +81,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=\"acme\"} |= \"Certificate check\" | json | line_format \"{{.context.days_remaining}}\"",
+          "expr": "last_over_time({operation=\"certificate_inventory\", agent_type=\"acme\"} | json | unwrap context_days_remaining [5m])",
           "queryType": "range",
           "refId": "A"
         }
@@ -148,7 +148,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=\"est\"} |= \"Certificate check\" | json | line_format \"{{.context.days_remaining}}\"",
+          "expr": "last_over_time({operation=\"certificate_inventory\", agent_type=\"est\"} | json | unwrap context_days_remaining [5m])",
           "queryType": "range",
           "refId": "A"
         }
@@ -435,7 +435,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=\"acme\"} |= \"Certificate check\" | json | line_format \"{{.context.lifetime_elapsed_pct}}\"",
+          "expr": "avg_over_time({operation=\"certificate_inventory\", agent_type=\"acme\"} | json | unwrap context_lifetime_percentage [5m])",
           "legendFormat": "ACME",
           "queryType": "range",
           "refId": "A"
@@ -446,7 +446,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=\"est\"} |= \"Certificate check\" | json | line_format \"{{.context.lifetime_elapsed_pct}}\"",
+          "expr": "avg_over_time({operation=\"certificate_inventory\", agent_type=\"est\"} | json | unwrap context_lifetime_percentage [5m])",
           "legendFormat": "EST",
           "queryType": "range",
           "refId": "B"

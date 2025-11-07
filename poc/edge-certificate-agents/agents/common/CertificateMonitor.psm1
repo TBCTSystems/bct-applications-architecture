@@ -296,6 +296,7 @@ function Get-CertificateInfo {
             NotBefore              = $cert.NotBefore
             NotAfter               = $cert.NotAfter
             SerialNumber           = $cert.SerialNumber
+            Thumbprint             = $cert.Thumbprint
             DaysRemaining          = $daysRemaining
             LifetimeElapsedPercent = $lifetimeElapsedPercent
         }

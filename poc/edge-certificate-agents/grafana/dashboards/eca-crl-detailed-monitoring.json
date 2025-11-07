@@ -81,7 +81,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"crl_parse\"} | json | revoked_count > 0",
+          "expr": "{operation=\"crl_parse\"} | json | context_revoked_count > 0",
           "queryType": "range",
           "refId": "A"
         }
@@ -159,7 +159,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"crl_age_check\"} | json | age_hours > 0",
+          "expr": "{operation=\"crl_age_check\"} | json | context_age_hours > 0",
           "queryType": "range",
           "refId": "A"
         }
@@ -251,7 +251,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"crl_parse\", status=\"success\"} | json | line_format \"{{.timestamp}} | Issuer: {{.issuer}} | Revoked Count: {{.revoked_count}} | This Update: {{.this_update}} | Next Update: {{.next_update}} | Serials: {{.revoked_serials}}\"",
+          "expr": "{operation=\"crl_parse\", status=\"success\"} | json | line_format \"{{.timestamp}} | Issuer: {{.context_issuer}} | Revoked Count: {{.context_revoked_count}} | This Update: {{.context_this_update}} | Next Update: {{.context_next_update}} | Serials: {{.context_revoked_serials}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -288,7 +288,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"certificate_revocation_check\", status=\"revoked\"} | json | line_format \"{{.timestamp}} | REVOKED | Serial: {{.cert_serial}} | Thumbprint: {{.cert_thumbprint}} | Subject: {{.cert_subject}}\"",
+          "expr": "{operation=\"certificate_revocation_check\", status=\"revoked\"} | json | line_format \"{{.timestamp}} | REVOKED | Serial: {{.context_cert_serial}} | Thumbprint: {{.context_cert_thumbprint}} | Subject: {{.context_cert_subject}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -325,7 +325,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"certificate_revocation_check\", status=\"valid\"} | json | line_format \"{{.timestamp}} | VALID | Serial: {{.cert_serial}} | Thumbprint: {{.cert_thumbprint}} | Subject: {{.cert_subject}} | CRL Count: {{.crl_revoked_count}}\"",
+          "expr": "{operation=\"certificate_revocation_check\", status=\"valid\"} | json | line_format \"{{.timestamp}} | VALID | Serial: {{.context_cert_serial}} | Thumbprint: {{.context_cert_thumbprint}} | Subject: {{.context_cert_subject}} | CRL Count: {{.context_crl_revoked_count}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -449,7 +449,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=\"crl_download\", status=\"success\"} | json | line_format \"{{.timestamp}} | Downloaded CRL | URL: {{.crl_url}} | Size: {{.file_size_bytes}} bytes\"",
+          "expr": "{operation=\"crl_download\", status=\"success\"} | json | line_format \"{{.timestamp}} | Downloaded CRL | URL: {{.context_crl_url}} | Size: {{.context_file_size_bytes}} bytes\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -486,7 +486,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{operation=~\"crl_.*\", status=\"failed\"} | json | line_format \"{{.timestamp}} | {{.operation}} | Error: {{.error}}\"",
+          "expr": "{operation=~\"crl_.*\", status=\"failed\"} | json | line_format \"{{.timestamp}} | {{.operation}} | Error: {{.context_error}}\"",
           "queryType": "range",
           "refId": "A"
         }

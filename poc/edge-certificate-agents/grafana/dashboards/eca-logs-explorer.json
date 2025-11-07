@@ -3,6 +3,7 @@
     "list": []
   },
   "editable": true,
+  "description": "Real-time log explorer for ECA agents (ACME and EST). Currently captures structured JSON logs from certificate lifecycle operations. Filter by agent type, severity, and search terms.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
@@ -38,7 +39,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=~\"$agent_type\"} |~ \"$search\" | severity =~ \"$severity\"",
+          "expr": "{job=\"eca-agents\", agent_type=~\"$agent_type\"} |~ \"$search\" | severity =~ \"$severity\"",
           "queryType": "range",
           "refId": "A"
         }

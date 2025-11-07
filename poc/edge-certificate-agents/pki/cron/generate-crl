@@ -1,0 +1,16 @@
+# ==============================================================================
+# CRL Generation Cron Configuration
+# ==============================================================================
+# Scheduled task for automatic Certificate Revocation List (CRL) generation
+# This file can be installed to /etc/cron.d/ or used as a template
+# ==============================================================================
+
+# Run CRL generation every hour at :05 (e.g., 00:05, 01:05, 02:05)
+# Format: minute hour day month weekday user command
+5 * * * * step /home/step/scripts/generate-crl.sh
+
+# Alternative: Run every 6 hours for less frequent updates
+# 5 */6 * * * step /home/step/scripts/generate-crl.sh
+
+# Alternative: Run twice daily (at 00:05 and 12:05)
+# 5 0,12 * * * step /home/step/scripts/generate-crl.sh

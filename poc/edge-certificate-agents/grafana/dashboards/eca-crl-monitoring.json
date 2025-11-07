@@ -412,7 +412,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum by (agent_type) (count_over_time({agent_type=~\"acme|est\"} |= \"CRL validation\" [5m]))",
+          "expr": "sum by (agent_type) (count_over_time({operation=\"certificate_revocation_check\"} [5m]))",
           "legendFormat": "{{agent_type}}",
           "queryType": "range",
           "refId": "A"
@@ -513,8 +513,8 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=~\"acme|est\"} |= \"CRL cache updated\" | json | line_format \"{{.context_crl_age_hours}}\"",
-          "legendFormat": "CRL Age",
+          "expr": "avg by (agent_type) (avg_over_time({operation=\"crl_age_check\"} | json | unwrap context_age_hours [5m]))",
+          "legendFormat": "{{agent_type}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -604,8 +604,8 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=~\"acme|est\"} |= \"CRL cache updated\" | json | line_format \"{{.context_revoked_count}}\"",
-          "legendFormat": "Revoked Certificates",
+          "expr": "max by (agent_type) (max_over_time({operation=\"crl_parse\"} | json | unwrap context_revoked_count [5m]))",
+          "legendFormat": "{{agent_type}}",
           "queryType": "range",
           "refId": "A"
         }
