@@ -227,7 +227,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "(time() - timestamp(last_over_time({agent_type=\"acme\"}[5m])))",
+          "expr": "count_over_time({agent_type=\"acme\"}[1m])",
           "queryType": "instant",
           "refId": "A"
         }
@@ -306,7 +306,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "(time() - timestamp(last_over_time({agent_type=\"est\"}[5m])))",
+          "expr": "count_over_time({agent_type=\"est\"}[1m])",
           "queryType": "instant",
           "refId": "A"
         }
@@ -484,7 +484,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=~\"acme|est\"} |= \"renewal\" or \"enrollment\"",
+          "expr": "{job=\"eca-agents\", operation=~\"acme_protocol|est_protocol|certificate_inventory|workflow_step_execution\"}",
           "queryType": "range",
           "refId": "A"
         }
@@ -546,7 +546,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{agent_type=~\"acme|est\"} |= \"Certificate check\" | json",
+          "expr": "{operation=\"certificate_inventory\"} | json",
           "queryType": "range",
           "refId": "A"
         }
@@ -558,6 +558,94 @@
           "options": {
             "format": "json",
             "source": "Line"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Time",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Time": {
+                "aggregation": "last",
+                "operation": "aggregate"
+              },
+              "context_agent_type": {
+                "aggregation": "last",
+                "operation": "groupby"
+              },
+              "context_cert_subject": {
+                "aggregation": "last",
+                "operation": "aggregate"
+              },
+              "context_cert_serial": {
+                "aggregation": "last",
+                "operation": "aggregate"
+              },
+              "context_cert_thumbprint": {
+                "aggregation": "last",
+                "operation": "aggregate"
+              },
+              "context_expiry_date": {
+                "aggregation": "last",
+                "operation": "aggregate"
+              },
+              "context_days_remaining": {
+                "aggregation": "last",
+                "operation": "aggregate"
+              },
+              "context_lifetime_percentage": {
+                "aggregation": "last",
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Line": true,
+              "container_id": true,
+              "container_name": true,
+              "id": true,
+              "labels": true,
+              "log_source": true,
+              "source": true,
+              "tsNs": true,
+              "context": true,
+              "message": true
+            },
+            "indexByName": {
+              "Time (last)": 0,
+              "context_agent_type": 1,
+              "context_cert_subject (last)": 2,
+              "context_cert_serial (last)": 3,
+              "context_cert_thumbprint (last)": 4,
+              "context_expiry_date (last)": 5,
+              "context_days_remaining (last)": 6,
+              "context_lifetime_percentage (last)": 7
+            },
+            "renameByName": {
+              "context_agent_type": "Agent",
+              "context_cert_subject (last)": "Subject",
+              "context_cert_serial (last)": "Serial",
+              "context_cert_thumbprint (last)": "Thumbprint",
+              "context_expiry_date (last)": "Expiry Date",
+              "context_days_remaining (last)": "Days Remaining",
+              "context_lifetime_percentage (last)": "Lifetime %",
+              "Time (last)": "Last Update"
+            }
           }
         }
       ],
