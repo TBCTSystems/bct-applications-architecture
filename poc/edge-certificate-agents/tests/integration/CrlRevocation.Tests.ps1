@@ -6,6 +6,10 @@
 # ==============================================================================
 
 BeforeAll {
+    # Import Logger module first (required by CrlValidator)
+    $loggerPath = Resolve-Path "$PSScriptRoot/../../agents/common/Logger.psm1"
+    Import-Module $loggerPath -Force
+
     # Import CRL validator module
     $modulePath = Resolve-Path "$PSScriptRoot/../../agents/common/CrlValidator.psm1"
     Import-Module $modulePath -Force
