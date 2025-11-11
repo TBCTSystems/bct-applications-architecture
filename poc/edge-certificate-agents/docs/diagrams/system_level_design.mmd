@@ -1,0 +1,113 @@
+flowchart TB
+    subgraph Reveos21["Reveos 2.1 Device"]
+        direction LR
+        R_OPCERT["🔐 Operational Client Certificate
+Short-lived validity"]
+        PKI_CLIENT["PKI Client
+(ACME/EST/JWK)"]
+        R_APPS["Device Communications
+• EoR
+• Download protocol
+• ConfigCheck"]
+
+        PKI_CLIENT -->|Manages| R_OPCERT
+        R_OPCERT -->|Used by| R_APPS
+    end
+
+    subgraph Lumia11["Lumia 1.1 Server"]
+        direction TB
+        L_OPCERT["🔐 Operational Service Certificate
+Short-lived (configurable)"]
+        ECA["Edge Certificate Agent
+Windows Service"]
+
+        subgraph Components["Server Components"]
+            DCS_SERVICE["C# Reveos DCS
+(MQTT Handlers)"]
+            MINIO_CLIENT["MinIO Clients
+(S3 Operations)"]
+            IIS["Lumia IIS Endpoints
+REST APIs"]
+            SQL_CLIENT["Lumia SQL Client
+(Database Access)"]
+            MEMURAI_CLIENT["Memurai Handlers
+(Cache Access)"]
+            NSB_CLIENT["NServiceBus Components
+(AMQP Messaging)"]
+        end
+
+        subgraph Services["Hosted Services"]
+            MINIO_SERVER["💾 MinIO Server
+Object Storage
+Port 9000"]
+            MOSQUITTO["📡 Mosquitto
+MQTT Broker
+Port 8883"]
+            RABBITMQ["📦 RabbitMQ
+AMQP Broker
+Port 5671"]
+            SQL_SERVER["🗄️ SQL Server
+Database"]
+            MEMURAI_SERVER["⚡ Memurai
+Redis Cache"]
+        end
+
+        ECA -->|Provisions certs to| L_OPCERT
+        L_OPCERT -->|Used by| DCS_SERVICE
+        L_OPCERT -->|Used by| MINIO_CLIENT
+        L_OPCERT -->|Used by| IIS
+    end
+
+    subgraph Connections["mTLS Connections"]
+        R_APPS -->|"mTLS
+(Operational Client Cert)"| MOSQUITTO
+        R_APPS -->|"mTLS
+(Operational Client Cert)"| IIS
+        R_APPS -->|"mTLS
+(Operational Client Cert)"| MINIO_SERVER
+
+        DCS_SERVICE -->|"mTLS
+(Operational Client Cert)"| MOSQUITTO
+        MINIO_CLIENT -->|"mTLS
+(Operational Client Cert)"| MINIO_SERVER
+        IIS -->|"mTLS
+(Operational Service Cert)"| External[External Services]
+        SQL_CLIENT -->|"mTLS
+(Operational Client Cert)"| SQL_SERVER
+        MEMURAI_CLIENT -->|"mTLS
+(Operational Client Cert)"| MEMURAI_SERVER
+        NSB_CLIENT -->|"mTLS
+(Operational Client Cert)"| RABBITMQ
+    end
+
+    subgraph PKI_Infrastructure["PKI Infrastructure"]
+        PKI_SERVICE_NODE["PKI Service
+ACME / EST / Token"]
+        PKI_CLIENT -->|Protocol| PKI_SERVICE_NODE
+        ECA -->|ACME Protocol| PKI_SERVICE_NODE
+        STEPCA_FALLBACK[(Customer-hosted step-ca
+Terumo-certified Alternative)]
+        PKI_CLIENT -->|Alternative when constraints exist| STEPCA_FALLBACK
+        ECA -->|Alternative ACME| STEPCA_FALLBACK
+    end
+
+    style Reveos21 fill:#e0f2fe,stroke:#111,stroke-width:5px,color:#0f172a
+    style Lumia11 fill:#fef3c7,stroke:#111,stroke-width:5px,color:#0f172a
+    style R_OPCERT fill:#10b981,stroke:#111,stroke-width:5px,color:#FFFFFF
+    style L_OPCERT fill:#34d399,stroke:#111,stroke-width:5px,color:#0f172a
+    style ECA fill:#bae6fd,stroke:#111,stroke-width:5px,color:#0f172a
+    style PKI_CLIENT fill:#dcfce7,stroke:#111,stroke-width:5px,color:#0f172a
+    style R_APPS fill:#dcfce7,stroke:#111,stroke-width:5px,color:#0f172a
+    style MOSQUITTO fill:#dcfce7,stroke:#111,stroke-width:5px,color:#0f172a
+    style MINIO_SERVER fill:#dcfce7,stroke:#111,stroke-width:5px,color:#0f172a
+    style DCS_SERVICE fill:#dcfce7,stroke:#111,stroke-width:5px,color:#0f172a
+    style MINIO_CLIENT fill:#dcfce7,stroke:#111,stroke-width:5px,color:#0f172a
+    style IIS fill:#f9fafb,stroke:#111,stroke-width:5px,stroke-dasharray:6 3,color:#1f2937
+    style SQL_CLIENT fill:#f9fafb,stroke:#111,stroke-width:5px,stroke-dasharray:6 3,color:#1f2937
+    style MEMURAI_CLIENT fill:#f9fafb,stroke:#111,stroke-width:5px,stroke-dasharray:6 3,color:#1f2937
+    style NSB_CLIENT fill:#f9fafb,stroke:#111,stroke-width:5px,stroke-dasharray:6 3,color:#1f2937
+    style RABBITMQ fill:#f9fafb,stroke:#111,stroke-width:5px,stroke-dasharray:6 3,color:#1f2937
+    style SQL_SERVER fill:#f9fafb,stroke:#111,stroke-width:5px,stroke-dasharray:6 3,color:#1f2937
+    style MEMURAI_SERVER fill:#f9fafb,stroke:#111,stroke-width:5px,stroke-dasharray:6 3,color:#1f2937
+    style PKI_SERVICE_NODE fill:#1E3A8A,stroke:#111,stroke-width:5px,color:#FFFFFF
+    style STEPCA_FALLBACK fill:#0F172A,stroke:#1F2937,stroke-width:5px,color:#FFFFFF

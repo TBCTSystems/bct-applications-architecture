@@ -1,4 +1,3 @@
-```mermaid
 sequenceDiagram
     autonumber
     participant Agent as Agent Loop
@@ -10,7 +9,7 @@ sequenceDiagram
     participant Volume as Shared Volume (/certs/server)
     participant Installer as Certificate Installer
     participant Reload as Reload Controller
-    participant Nginx as Target Server (NGINX)
+    participant Nginx as Target Server (Mosquitto, MinIO)
 
     Agent->>Monitor: Check certificate status
     Monitor->>Volume: Read server.crt
@@ -44,4 +43,3 @@ sequenceDiagram
     Agent->>Reload: nginx -s reload
     Reload->>Nginx: Reload TLS config
     Agent-->>Agent: Log success & sleep
-```

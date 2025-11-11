@@ -1,0 +1,41 @@
+sequenceDiagram
+    participant Agent as Certificate Agent
+    participant FS as File System<br/>(Shared Volume)
+    participant PKI as PKI Service<br/>(step-ca)
+    participant Target as Target Service<br/>(Windows/Client)
+    participant Monitor as Monitoring<br/>(FluentD)
+
+    Note over Agent: Polling Loop Start
+
+    Agent->>FS: 1. Read existing certificate
+    FS-->>Agent: Certificate file (if exists)
+
+    Agent->>Agent: 2. Check expiry & threshold
+
+    alt Certificate needs renewal
+        Agent->>Agent: 3. Generate private key (CSR)
+        Agent->>PKI: 4. Enrollment request (ACME/EST)
+
+        alt ACME Protocol
+            PKI-->>Agent: 5a. Challenge details (HTTP-01)
+            Agent->>FS: 6a. Write challenge file
+            PKI->>Target: 7a. Validate challenge (HTTP GET)
+            Target->>FS: 8a. Read challenge file
+            FS-->>Target: Challenge response
+            Target-->>PKI: Challenge response
+        else EST Protocol
+            Note over Agent,PKI: 5b. Bootstrap token<br/>or mTLS auth
+        end
+
+        PKI-->>Agent: 9. Certificate issued
+        Agent->>Agent: 10. Validate certificate chain
+        Agent->>FS: 11. Atomic write (cert + key)
+        Agent->>Target: 12. Trigger reload (SIGHUP)
+        Target->>FS: 13. Read new certificate
+        Agent->>Monitor: 14. Log success event
+    else Certificate OK
+        Agent->>Monitor: Skip renewal (log check)
+    end
+
+    Agent->>Agent: Sleep (check_interval_sec)
+    Note over Agent: Loop continues...

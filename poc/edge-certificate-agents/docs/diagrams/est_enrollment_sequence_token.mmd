@@ -1,4 +1,3 @@
-```mermaid
 sequenceDiagram
     autonumber
     participant Agent as Agent Loop
@@ -40,46 +39,3 @@ sequenceDiagram
         EST-->>Agent: Enrollment failed
         Agent-->>Agent: Log error & retry later
     end
-```
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Agent as Agent Loop
-    participant Monitor as Certificate Monitor
-    participant Engine as Renewal Engine
-    participant EST as EST Client
-    participant Crypto as Crypto Helper
-    participant PKI as step-ca PKI
-    participant Installer as Certificate Installer
-    participant Volume as Shared Volume (/certs/client)
-
-    Agent->>Monitor: Check certificate status
-    Monitor->>Volume: Read client.crt
-    Volume-->>Monitor: Certificate PEM
-    Monitor->>Crypto: Parse certificate
-    Crypto-->>Monitor: Expiry 2025-10-24 10:08:00
-    Monitor-->>Agent: Lifetime = 78%
-    Agent->>Engine: Evaluate renewal threshold
-    Engine-->>Agent: Renewal needed (≥75%)
-
-    Agent->>EST: Start re-enrollment
-    EST->>Crypto: Generate CSR (existing key or new key)
-    EST->>PKI: POST /simplereenroll (mTLS auth)
-
-    alt Re-enrollment success
-        PKI-->>EST: 200 OK (PKCS#7 cert)
-        EST->>Crypto: Extract certificate
-        Crypto-->>EST: Renewed certificate
-        EST-->>Agent: Certificate + key
-        Agent->>Installer: Publish cert/key
-        Installer->>Volume: Atomic write client.key
-        Installer->>Volume: Atomic write client.crt
-        Installer-->>Agent: Installation complete
-        Agent-->>Agent: Log success & sleep
-    else PKI rejects request
-        PKI-->>EST: 4xx/5xx response
-        EST-->>Agent: Renewal failed
-        Agent-->>Agent: Log error, continue monitoring
-    end
-```

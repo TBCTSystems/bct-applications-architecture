@@ -1,0 +1,132 @@
+%% Mid-Level Agent Architecture (ACME & EST)
+%% Focus: Internal layering + key runtime interactions per loop iteration
+%% Mermaid version agnostic (flowchart)
+
+flowchart TB
+    %% LAYERS
+    subgraph L1[Layer 1: Thin Orchestration Scripts]
+        ACME_AGENT[ACME Orchestrator - load config, init logging, register steps, start loop]
+        EST_AGENT[EST Orchestrator - load config, init logging, register steps, start loop]
+    end
+
+    subgraph L2[Layer 2: Generic Workflow Engine]
+        ORCH[WorkflowOrchestrator - state machine, loop, metrics, retry]
+    end
+
+    subgraph L3A[Layer 3A: ACME Protocol Workflow]
+        ACME_WF[AcmeWorkflow - monitor, decide, execute, validate]
+    end
+
+    subgraph L3B[Layer 3B: EST Protocol Workflow]
+        EST_WF[EstWorkflow - monitor, decide, execute, validate]
+    end
+
+    subgraph L4[Layer 4: Common Modules]
+        LOGGER[Logger - JSON & console]
+        CONFIG[ConfigManager - YAML + env override + schema]
+        CERTMON[CertificateMonitor - existence, expiry, lifetime%]
+        CRL[CrlValidator - download, cache, revocation]
+        CRYPTO[CryptoHelper - key gen, CSR, parse]
+        FILEOPS[FileOperations - atomic write, permissions]
+        BOOTSTRAP[BootstrapTokenManager - EST bootstrap token]
+    end
+
+    subgraph EXT[External Services]
+        PKI[PKI step-ca endpoints]
+        CRL_DIST[CRL Distribution Point]
+    end
+
+    subgraph STORAGE[Shared Storage Volumes]
+        SERVER_CERTS[(/certs/server)]
+        CLIENT_CERTS[(/certs/client)]
+        CHALLENGE_DIR[(/challenge HTTP-01)]
+    end
+
+    subgraph OBS[Observability]
+        LOG_PIPE[Fluentd JSON log ingestion & metrics]
+    end
+
+    %% ORCHESTRATION RELATIONSHIPS
+    ACME_AGENT --> ORCH
+    EST_AGENT --> ORCH
+    ORCH --> ACME_WF
+    ORCH --> EST_WF
+
+    %% WORKFLOW STEP DEPENDENCIES (ACME)
+    ACME_WF --> CERTMON
+    ACME_WF --> CRL
+    ACME_WF --> CRYPTO
+    ACME_WF --> FILEOPS
+    ACME_WF --> LOGGER
+    ACME_WF --> CONFIG
+
+    %% WORKFLOW STEP DEPENDENCIES (EST)
+    EST_WF --> CERTMON
+    EST_WF --> CRL
+    EST_WF --> CRYPTO
+    EST_WF --> FILEOPS
+    EST_WF --> LOGGER
+    EST_WF --> CONFIG
+    EST_WF --> BOOTSTRAP
+
+    %% PROTOCOL INTERACTIONS
+    ACME_WF -->|ACME Order / Challenges| PKI
+    EST_WF -->|EST enroll / reenroll| PKI
+
+    %% CRL FLOW
+    CRL -->|Download CRL| CRL_DIST
+
+    %% STORAGE WRITES
+    ACME_WF -->|Write cert/key| SERVER_CERTS
+    ACME_WF -->|Write HTTP-01 challenge| CHALLENGE_DIR
+    EST_WF -->|Write cert/key| CLIENT_CERTS
+
+    %% SERVICE READS (implicit external actors)
+    SERVER_CERTS -->|Consumed by target server| PKI
+    CLIENT_CERTS -->|Used for mTLS requests| PKI
+
+    %% LOGGING
+    LOGGER -->|Structured JSON logs| LOG_PIPE
+    ACME_WF -->|Structured logs| LOG_PIPE
+    EST_WF -->|Structured logs| LOG_PIPE
+    ORCH -->|Metrics snapshot| LOG_PIPE
+
+    %% DECISION FLOW (ANNOTATIONS)
+    classDef decision fill:#fef9e7,stroke:#d4b943,stroke-width:1px;
+    classDef storage fill:#eef7ff,stroke:#4a90e2,stroke-width:1px;
+    class SERVER_CERTS,CLIENT_CERTS,CHALLENGE_DIR storage;
+
+    %% LOOP SEQUENCE (INLINE COMMENT)
+    %% Each iteration per agent:
+    %% 1. Monitor -> CERTMON + optional CRL check (CRL)
+    %% 2. Decide  -> Compute action (enroll/renew/reenroll/skip)
+    %% 3. Execute -> Protocol call (PKI) + key/cert atomic write (FILEOPS + CRYPTO)
+    %% 4. Validate -> File presence + permissions; optional service reload (future ServiceReloadController)
+    %% 5. Log + metrics -> LOGGER + ORCH -> LOG_PIPE
+
+    %% Styling
+    style ACME_AGENT fill:#fff4e6,stroke:#e8922e
+    style EST_AGENT fill:#fff4e6,stroke:#e8922e
+    style ORCH fill:#f0f4ff,stroke:#4a90e2
+    style ACME_WF fill:#e8f5e9,stroke:#2e7d32
+    style EST_WF fill:#e8f5e9,stroke:#2e7d32
+    style LOGGER fill:#f3e5f5,stroke:#7b1fa2
+    style CONFIG fill:#f3e5f5,stroke:#7b1fa2
+    style CERTMON fill:#f3e5f5,stroke:#7b1fa2
+    style CRL fill:#f3e5f5,stroke:#7b1fa2
+    style CRYPTO fill:#f3e5f5,stroke:#7b1fa2
+    style FILEOPS fill:#f3e5f5,stroke:#7b1fa2
+    style BOOTSTRAP fill:#f3e5f5,stroke:#7b1fa2
+    style PKI fill:#e1f5ff,stroke:#0277bd
+    style CRL_DIST fill:#e1f5ff,stroke:#0277bd
+    style LOG_PIPE fill:#ede7f6,stroke:#5e35b1
+
+    %% Legend
+    subgraph Legend[Legend]
+        L_ORCH[Workflow Engine]:::orch
+        L_PROTO[Protocol Workflow]:::proto
+        L_COMMON[Common Module]:::common
+    end
+    classDef orch fill:#f0f4ff,stroke:#4a90e2;
+    classDef proto fill:#e8f5e9,stroke:#2e7d32;
+    classDef common fill:#f3e5f5,stroke:#7b1fa2;
