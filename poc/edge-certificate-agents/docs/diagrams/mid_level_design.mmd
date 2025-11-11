@@ -1,0 +1,56 @@
+graph TB
+    subgraph "External PKI Infrastructure"
+        PKI[PKI Service<br/>step-ca / Customer CA<br/>ACME + EST Endpoints<br/>Port: 4210 HTTPS]
+        CRL[CRL Distribution<br/>HTTP Server<br/>Port: 4211 HTTP]
+    end
+
+    subgraph "Certificate Management Agents"
+        ACME[ACME Agent<br/>JWK option<br/>PowerShell Core<br/>Server Cert Lifecycle]
+        EST[ACME/EST Agents<br/>JWK option<br/>PowerShell Core<br/>Client Cert Lifecycle]
+    end
+
+    subgraph "Target Services"
+        WINDOWS[Target Server<br/>Windows - MinIO, Mosquito<br/>Port: 4214 HTTPS<br/>Port: 4215 HTTP]
+        CLIENT[Target Client<br/>MinIO, Mosquito, DCS, EndOfRun etc<br/>mTLS Client]
+    end
+
+    subgraph "Observability Stack"
+        FLUENTD[Fluentd<br/>Log Aggregation<br/>Port: 4217]
+    end
+
+    subgraph "Shared Storage"
+        SERVERCERTS[(Server Certs<br/>Folder)]
+        CLIENTCERTS[(Client Certs<br/>Folder)]
+        CHALLENGE[(ACME Challenge<br/>Folder)]
+    end
+
+    %% ACME Agent Flows
+    ACME -->|HTTPS<br/>ACME Protocol| PKI
+    ACME -->|Write Certs| SERVERCERTS
+    ACME -->|Write Challenge| CHALLENGE
+    ACME -->|Trigger Reload| WINDOWS
+    ACME -->|Download CRL| CRL
+
+    %% EST Agent Flows
+    EST -->|HTTPS<br/>ACME/EST Protocol| PKI
+    EST -->|Write Certs| CLIENTCERTS
+    EST -->|Trigger Reload| CLIENT
+    EST -->|Download CRL| CRL
+
+    %% Target Service Flows
+    WINDOWS -->|Read Certs| SERVERCERTS
+    WINDOWS -->|Read Challenge| CHALLENGE
+    CLIENT -->|Read Certs| CLIENTCERTS
+
+    %% PKI Validation Flow
+    PKI -.->|HTTP-01<br/>Challenge Validation| WINDOWS
+
+    %% Logging Flows
+    ACME -->|JSON Logs| FLUENTD
+    EST -->|JSON Logs| FLUENTD
+    WINDOWS -->|Access Logs| FLUENTD
+
+    style PKI fill:#e1f5ff
+    style ACME fill:#fff4e6
+    style EST fill:#fff4e6
+    style WINDOWS fill:#e8f5e9
